@@ -2,6 +2,8 @@
 
 ## instructions
 
+Pull changes: `git pull origin master`
+
 open a virtual environment for server:
 
 1. go to ther server folder: `cd server`
