@@ -111,6 +111,7 @@ def broadcast_loop(server_name: str, server_port: int) -> None:
 
 
 def handle_new_connection(client_socket: socket.socket, client_address: tuple) -> None:
+    print("New connection from ", client_address)
     handler: ClientHandler = ClientHandler(client_socket=client_socket)
     CLIENTS_HANDLERS.append(handler)
     handler.start()
@@ -142,7 +143,8 @@ def game_loop():
 
     # start the game
     GAME_STARTED = True
-    GAME_STARTED_CONDITION.notify_all()
+    with GAME_STARTED_CONDITION:
+        GAME_STARTED_CONDITION.notify_all()
 
     in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
     selected_questions_indices = [-1]
