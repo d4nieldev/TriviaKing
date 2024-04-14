@@ -23,7 +23,7 @@ class ClientHandler:
         self.name: str = None
         self.answer: bool = None
         self.correct: bool = None
-        self.in_game: bool = False
+        self.in_game: bool = True
 
     def start(self):
         self.thread.start()
@@ -118,12 +118,14 @@ def handle_new_connection(client_socket: socket.socket, client_address: tuple) -
 
 
 def handle_incoming_connections(server_socket: socket.socket) -> None:
-    prev_connection_time = time.time()
-
     # Accept incoming connections
-    while time.time() - prev_connection_time < c.CLIENT_NO_JOIN_TIMEOUT_SEC:
-        client_socket, client_address = server_socket.accept()
-        handle_new_connection(client_socket, client_address)
+    while True:
+        try:
+            client_socket, client_address = server_socket.accept()
+            handle_new_connection(client_socket, client_address)
+        except socket.timeout:
+            print("Stopped listening for new connections.")
+            break
 
 
 def send_welcome_message() -> None:
@@ -190,7 +192,8 @@ def listen(server_port: int = 0) -> None:
     # Create a TCP socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
-        server_socket.bind((c.LOCALHOST_ADDRESS, server_port))
+        server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
+        server_socket.bind((ip_address, server_port))
         server_port = server_socket.getsockname()[1]
 
         broadcast_thread = threading.Thread(target=broadcast_loop,
