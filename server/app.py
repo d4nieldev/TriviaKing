@@ -4,8 +4,8 @@ import struct
 import time
 import random
 
-from .. import constants as c
 from questions import QUESTIONS
+import constants as c
 
 
 GAME_STARTED_CONDITION: threading.Condition = threading.Condition()
@@ -183,17 +183,18 @@ def send_game_over_message():
 def listen(server_port: int = 0) -> None:
     global SEND_BROADCAST
 
-    broadcast_thread = threading.Thread(target=broadcast_loop,
-                                        args=(c.SERVER_NAME,))
-    SEND_BROADCAST = True
-    broadcast_thread.start()
-
     ip_address = get_ip_address()
 
     # Create a TCP socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
         server_socket.bind((c.LOCALHOST_ADDRESS, server_port))
+        server_port = server_socket.getsockname()[1]
+
+        broadcast_thread = threading.Thread(target=broadcast_loop,
+                                            args=(c.SERVER_NAME, server_port))
+        SEND_BROADCAST = True
+        broadcast_thread.start()
 
         # Start listening for incoming connections
         server_socket.listen()
