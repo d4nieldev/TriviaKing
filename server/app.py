@@ -4,7 +4,7 @@ import struct
 import time
 import random
 
-import constants as c
+from .. import constants as c
 from questions import QUESTIONS
 
 
