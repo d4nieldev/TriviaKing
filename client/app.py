@@ -21,7 +21,7 @@ class Client:
         self.state = new_state
         print(f"Transitioned to state: {new_state}")
         
-    def parse_broadcast_message(data: bytes):
+    def parse_broadcast_message(self, data: bytes):
         # Expected format of the received packet
         format_specifier = '>IB32sH'  # Big-endian unsigned int, unsigned byte, 32-byte string, unsigned short
         
@@ -43,8 +43,8 @@ class Client:
 
     def find_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
-            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            udp_socket.bind((c.BROADCAST_ADDRESS, c.BROADCAST_PORT))  # Bind to the broadcast port
+            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            udp_socket.bind(('', c.BROADCAST_PORT))  # Bind to the broadcast port
             try:
                 print("Listening for server broadcasts...")
                 data, addr = udp_socket.recvfrom(self.BUFFER_SIZE)
