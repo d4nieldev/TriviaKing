@@ -96,7 +96,7 @@ def create_broadcast_packet(server_name: str, server_port: int) -> bytes:
     return udp_packet
 
 
-def broadcast_loop(server_name: str, server_port: int) -> None:
+def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
     # Creating the UDP packet
     udp_packet = create_broadcast_packet(server_name=server_name,
                                          server_port=server_port)
@@ -105,6 +105,7 @@ def broadcast_loop(server_name: str, server_port: int) -> None:
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.bind((ip_address, c.BROADCAST_PORT))
         while SEND_BROADCAST:
             sock.sendto(udp_packet, broadcast_address)
             time.sleep(c.SERVER_BROADCAST_PERIOD_SEC)
@@ -197,7 +198,7 @@ def listen(server_port: int = 0) -> None:
         server_socket.bind((ip_address, server_port))
 
         broadcast_thread = threading.Thread(target=broadcast_loop,
-                                            args=(c.SERVER_NAME, server_port))
+                                            args=(ip_address, c.SERVER_NAME, server_port))
         SEND_BROADCAST = True
         broadcast_thread.start()
 
