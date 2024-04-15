@@ -193,8 +193,8 @@ def listen(server_port: int = 0) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
         server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
-        server_socket.bind((ip_address, server_port))
         server_port = server_socket.getsockname()[1]
+        server_socket.bind((ip_address, server_port))
 
         broadcast_thread = threading.Thread(target=broadcast_loop,
                                             args=(c.SERVER_NAME, server_port))

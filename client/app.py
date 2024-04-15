@@ -46,7 +46,7 @@ class Client:
 
     def find_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
-            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             # Bind to the broadcast port
             udp_socket.bind(('', c.BROADCAST_PORT))
             try:
