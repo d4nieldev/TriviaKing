@@ -28,6 +28,9 @@ class ClientHandler:
     def start(self):
         self.thread.start()
 
+    def exit_game(self):
+        self.in_game = False
+
     def handle(self):
         # get client name
         message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
@@ -38,12 +41,23 @@ class ClientHandler:
             while not GAME_STARTED:
                 GAME_STARTED_CONDITION.wait()
 
-        self.in_game = True
+            self.in_game = True
+
         while GAME_STARTED:
             # get answer from client
             answer = None
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
-                answer = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE).decode()
+                response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
+                if response == 0:
+                    # client disconnected
+                    print(f"{self.name} disconnected.")
+                    self.exit_game()
+                    return
+                answer = response.decode()
+                if answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
+                    error_message = c.ERROR_MESSAGE
+                    error_message += f"Invalid answer: {answer}"
+                    self.socket.sendall(error_message.encode())
 
             with WAIT_FOR_ANSWERS_CONDITION:
                 self.answer = True if answer in c.TRUE_ANSWERS else False
@@ -60,9 +74,6 @@ class ClientHandler:
             # reset answer and correct fields
             self.answer = None
             self.correct = None
-
-        # game ended for this player
-        self.in_game = False
 
 
 SEND_BROADCAST: bool = False
@@ -130,7 +141,8 @@ def handle_incoming_connections(server_socket: socket.socket) -> None:
 
 
 def send_welcome_message() -> None:
-    welcome_message = f'Welcome to {c.SERVER_NAME} trivia king!\n'
+    welcome_message = c.WELCOME_MESSAGE
+    welcome_message += f'Welcome to {c.SERVER_NAME} trivia king!\n'
     for i, client_handler in enumerate(CLIENTS_HANDLERS):
         player_name = client_handler.name
         welcome_message += f'Player {i + 1}: {player_name}\n'
@@ -139,6 +151,8 @@ def send_welcome_message() -> None:
     # send welcome message to every player
     for client_handler in CLIENTS_HANDLERS:
         client_handler.socket.sendall(welcome_message.encode())
+
+    time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
 
 
 def game_loop():
@@ -161,7 +175,10 @@ def game_loop():
 
         # send the question to all players
         for client_handler in in_game_players:
-            client_handler.socket.sendall(question.encode())
+            client_handler.socket.sendall(
+                (c.QUESTION_MESSAGE + question).encode())
+
+        print(f"Sent question: {question}. The answer is: {answer}")
 
         # wait for answers
         with WAIT_FOR_ANSWERS_CONDITION:
@@ -175,14 +192,39 @@ def game_loop():
         with ANSWERS_CHECKED_CONDITION:
             for client_handler in in_game_players:
                 client_handler.correct = client_handler.answer == answer
+                if not client_handler.correct:
+                    print(f"{client_handler.name} got the answer wrong.")
+                    client_handler.exit_game()
             ANSWERS_CHECKED_CONDITION.notify_all()
 
         # filter players
         in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
 
+    if len(in_game_players) == 0:
+        send_game_over_message(winner=None)
+    else:
+        winner_client_handler = in_game_players[0]
+        send_game_over_message(winner=winner_client_handler.name)
 
-def send_game_over_message():
-    pass
+
+def send_game_over_message(winner: str):
+    if winner is None:
+        # send all client message with the winner
+        for ch in CLIENTS_HANDLERS:
+            ch.socket.sendall((c.GAME_OVER_MESSAGE + "No winner").encode())
+        print("Game Over! (no winner)")
+    else:
+        # send all client message with the winner
+        for ch in CLIENTS_HANDLERS:
+            msg = None
+            if ch.in_game:
+                msg = c.GAME_OVER_MESSAGE + "You are the winner!"
+            else:
+                msg = c.GAME_OVER_MESSAGE + f"The winner is: {winner}"
+
+            ch.socket.sendall(msg.encode())
+
+        print(f"Game Over! The winner is: {winner}")
 
 
 def listen(server_port: int = 0) -> None:
@@ -209,7 +251,6 @@ def listen(server_port: int = 0) -> None:
         handle_incoming_connections(server_socket=server_socket)
         send_welcome_message()
         game_loop()
-        send_game_over_message()
 
 
 if __name__ == '__main__':

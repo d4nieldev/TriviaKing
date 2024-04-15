@@ -76,23 +76,50 @@ class Client:
             self.disconnect()
 
     def game_mode(self):
-        self.tcp_socket.setblocking(0)
         try:
+            last_question = None
+            was_error = False
             while self.state == 'game_mode':
-                ready_to_read, _, _ = select.select(
-                    [self.tcp_socket, sys.stdin], [], [])
-                for sock in ready_to_read:
-                    if sock == self.tcp_socket:
-                        data = sock.recv(self.BUFFER_SIZE)
-                        if data:
-                            print(f"Received: {data.decode()}")
-                        else:
-                            print("Server disconnected.")
-                            self.transition_state('looking_for_server')
-                            return
-                    else:
-                        msg = sys.stdin.readline()
-                        self.tcp_socket.send(msg.encode())
+                if not was_error:
+                    data = self.tcp_socket.recv(self.BUFFER_SIZE)
+                else:
+                    data = last_question.encode()
+                    was_error = False
+
+                if data == 0:
+                    print("Server disconnected.")
+                    self.transition_state('looking_for_server')
+                    return
+
+                server_message = data.decode()
+                if server_message.startswith(c.WELCOME_MESSAGE):
+                    server_message = server_message.replace(
+                        c.WELCOME_MESSAGE, "")
+                    print(server_message)
+                elif server_message.startswith(c.ERROR_MESSAGE):
+                    server_message = server_message.replace(
+                        c.ERROR_MESSAGE, "")
+                    print("Error: " + server_message)
+                    server_message = last_question
+                    was_error = True
+                elif server_message.startswith(c.QUESTION_MESSAGE):
+                    last_question = server_message
+                    server_message = server_message.replace(
+                        c.QUESTION_MESSAGE, "")
+                    print(f"Question: {server_message}")
+                    msg = input("Answer: ")
+                    self.tcp_socket.sendall(msg.encode())
+                elif server_message.startswith(c.BYE_MESSAGE):
+                    server_message = server_message.replace(
+                        c.BYE_MESSAGE, "")
+                    print(server_message)
+                elif server_message.startswith(c.GAME_OVER_MESSAGE):
+                    server_message = server_message.replace(
+                        c.GAME_OVER_MESSAGE, "")
+                    print(server_message)
+                    self.transition_state('looking_for_server')
+                    return
+
         finally:
             self.disconnect()
 
@@ -113,7 +140,8 @@ class Client:
 
 
 if __name__ == '__main__':
-    client = Client("Te Quiero Putas")
+    client_name = input("Enter player name: ")
+    client = Client(client_name)
     client.run()
 
 
