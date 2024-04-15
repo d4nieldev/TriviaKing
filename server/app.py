@@ -122,7 +122,7 @@ def handle_incoming_connections(server_socket: socket.socket) -> None:
     # Accept incoming connections
     while True:
         try:
-            client_socket, client_address = server_socket.accept()
+            (client_socket, client_address) = server_socket.accept()
             handle_new_connection(client_socket, client_address)
         except socket.timeout:
             print("Stopped listening for new connections.")
@@ -194,8 +194,9 @@ def listen(server_port: int = 0) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
         server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
+        server_socket.bind((socket.gethostname(), server_port))
         server_port = server_socket.getsockname()[1]
-        server_socket.bind((ip_address, server_port))
+        server_socket.listen(5)
 
         broadcast_thread = threading.Thread(target=broadcast_loop,
                                             args=(ip_address, c.SERVER_NAME, server_port))
@@ -203,7 +204,6 @@ def listen(server_port: int = 0) -> None:
         broadcast_thread.start()
 
         # Start listening for incoming connections
-        server_socket.listen()
 
         print(f"Server started, listening on IP address {ip_address}")
         handle_incoming_connections(server_socket=server_socket)
