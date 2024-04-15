@@ -103,7 +103,7 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
     broadcast_address = (c.BROADCAST_ADDRESS, c.BROADCAST_PORT)
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind((ip_address, c.BROADCAST_PORT))
         while SEND_BROADCAST:
@@ -194,7 +194,7 @@ def listen(server_port: int = 0) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
         server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
-        server_socket.bind((socket.gethostname(), server_port))
+        server_socket.bind((ip_address, server_port))
         server_port = server_socket.getsockname()[1]
         server_socket.listen(5)
 
