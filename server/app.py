@@ -114,6 +114,8 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
     broadcast_address = (c.BROADCAST_ADDRESS, c.BROADCAST_PORT)
 
+    print("Server sending offers...")
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind((ip_address, c.BROADCAST_PORT))
@@ -141,6 +143,10 @@ def handle_incoming_connections(server_socket: socket.socket) -> None:
 
 
 def send_welcome_message() -> None:
+    global SEND_BROADCAST
+
+    SEND_BROADCAST = False
+
     welcome_message = c.WELCOME_MESSAGE
     welcome_message += f'Welcome to {c.SERVER_NAME} trivia king!\n'
     for i, client_handler in enumerate(CLIENTS_HANDLERS):
@@ -238,7 +244,7 @@ def listen(server_port: int = 0) -> None:
         server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
         server_socket.bind((ip_address, server_port))
         server_port = server_socket.getsockname()[1]
-        server_socket.listen(5)
+        server_socket.listen()
 
         broadcast_thread = threading.Thread(target=broadcast_loop,
                                             args=(ip_address, c.SERVER_NAME, server_port))
@@ -246,7 +252,7 @@ def listen(server_port: int = 0) -> None:
         broadcast_thread.start()
 
         # Start listening for incoming connections
-
+        # TODO: check that after the game is over, the server will run broadcast
         print(f"Server started, listening on IP address {ip_address}")
         handle_incoming_connections(server_socket=server_socket)
         send_welcome_message()
