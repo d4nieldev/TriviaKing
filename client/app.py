@@ -2,25 +2,24 @@ import constants as c
 import socket
 import random
 import struct
+import threading
 
 
 class Client:
     def __init__(self, team_name="Team 1", bot=False):
         self.server_port = None
-        self.BROADCAST_MSG = 'I want to play pandejo!'
         self.BUFFER_SIZE = 1024  # Assuming a buffer size value
-        self.team_name = team_name
+        self.team_name = self.generate_bot_name() if bot else team_name
+        self.BROADCAST_MSG = f'me llamo {self.team_name} and I want to play, pandejo!'
         self.tcp_socket = None
         self.server_ip = None
         self.server_name = None
+        self.bot = bot
         
         # States: looking_for_server, connecting_to_server, game_mode
         self.state = 'looking_for_server'
-        self.bot = bot
         
-        if bot:
-            self.team_name = self.generate_bot_name()
-    
+        
     @classmethod
     def generate_bot_name(cls):
         while True:
@@ -158,18 +157,41 @@ class Client:
                 self.game_mode()
 
 
+def create_player(team_name = "", bot = False):
+    '''
+    External method to create players, both human and bots, 
+    in order to activate as a thread worker if necessary.
+    '''
+    if bot:
+        client = Client(bot = True)
+        client.run()
+    else:
+        client = Client(team_name = team_name, bot = False)
+        client.run()
+    return
+
+
+
 if __name__ == '__main__':
     while True:
         client_type = input("""Hello comrad! Press P if you want to sign in as a player. 
                             Press B if you want a bot player to join the game""").lower().strip()
         if client_type == "b":
-            client = Client(bot=True)
-            client.run()
+            num_bots = random.randint(1, 7)  # Random number of bots will join the game
+            threads = []
+            for i in range(num_bots):
+                thread = threading.Thread(target=create_player, args=("", True))
+                threads.append(thread)
+                thread.start()
+            
+            # Wait for all threads to complete
+            for thread in threads:
+                thread.join()
             break
+        
         elif client_type == "p":
             team_name = input("Enter player name: ").strip()
-            client = Client(team_name=team_name, bot=False)
-            client.run()
+            create_player(team_name=team_name, bot=False)
             break
         else:
             print('Invalid player choice. Try better next time.')
