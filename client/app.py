@@ -1,8 +1,6 @@
 import constants as c
 import socket
-import select
-import sys
-import time
+import random
 import struct
 
 
@@ -10,14 +8,35 @@ class Client:
     def __init__(self, team_name="Team 1", bot=False):
         self.server_port = None
         self.BROADCAST_MSG = 'I want to play pandejo!'
-        self.BUFFER_SIZE = c.CLIENT_NAME_PACKET_SIZE
+        self.BUFFER_SIZE = 1024  # Assuming a buffer size value
         self.team_name = team_name
         self.tcp_socket = None
         self.server_ip = None
         self.server_name = None
+        
         # States: looking_for_server, connecting_to_server, game_mode
         self.state = 'looking_for_server'
         self.bot = bot
+        
+        if bot:
+            self.team_name = self.generate_bot_name()
+    
+    @classmethod
+    def generate_bot_name(cls):
+        while True:
+            random_number = random.randint(1, 99999999999)  # Generate a random number
+            if random_number not in c.BOT_USED_NUMBERS:
+                c.BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
+                return f"BOT_#{random_number}"  # Return the unique bot team name
+    
+    def answer_the_bloody_question(self):
+        if self.bot:
+            # Random answer can be replaced with any chatbot API, but we are poor
+            ans = random.choice(list(c.TRUE_ANSWERS.union(c.FALSE_ANSWERS)))
+        else:
+            ans = input("Answer: ").strip()
+        return ans
+            
 
     def transition_state(self, new_state):
         self.state = new_state
@@ -107,7 +126,7 @@ class Client:
                     server_message = server_message.replace(
                         c.QUESTION_MESSAGE, "")
                     print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
-                    msg = input("Answer: ")
+                    msg = self.answer_the_bloody_question()
                     self.tcp_socket.sendall(msg.encode())
                 elif server_message.startswith(c.BYE_MESSAGE):
                     server_message = server_message.replace(
@@ -140,21 +159,17 @@ class Client:
 
 
 if __name__ == '__main__':
-    client_name = input("Enter player name: ")
-    client = Client(client_name)
-    client.run()
-
-
-# def handle_bot():
-#     # send answer bot
-#     self.handle()
-# def handle_human():
-#     # send answer human
-#     self.handle()
-# if __name__ == "__main__":
-#     if len(sys.argv) == 2:
-#         if sys.argv[1] == 'bot':
-#             # be bot
-#             handle_bot()
-#     # be human
-#     handle_human()
+    while True:
+        client_type = input("""Hello comrad! Press P if you want to sign in as a player. 
+                            Press B if you want a bot player to join the game""").lower().strip()
+        if client_type == "b":
+            client = Client(bot=True)
+            client.run()
+            break
+        elif client_type == "p":
+            team_name = input("Enter player name: ").strip()
+            client = Client(team_name=team_name, bot=False)
+            client.run()
+            break
+        else:
+            print('Invalid player choice. Try better next time.')

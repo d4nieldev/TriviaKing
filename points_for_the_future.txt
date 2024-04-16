@@ -1,3 +1,5 @@
 1. '1' may be an integer
 2. use LLM for client bot (Mixtral)
 3. client - two threads: one for listening to keyboard, other for listening to TCP connection
+4. If message format is invalid - do we disconnect the UDP?
+5. Error handeling - disconnection of client?
