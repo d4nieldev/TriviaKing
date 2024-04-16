@@ -106,17 +106,17 @@ class Client:
                     last_question = server_message
                     server_message = server_message.replace(
                         c.QUESTION_MESSAGE, "")
-                    print(f"Question: {server_message}")
+                    print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
                     msg = input("Answer: ")
                     self.tcp_socket.sendall(msg.encode())
                 elif server_message.startswith(c.BYE_MESSAGE):
                     server_message = server_message.replace(
                         c.BYE_MESSAGE, "")
-                    print(server_message)
+                    print(f"{c.COLOR_RED}{server_message}{c.COLOR_RESET}")
                 elif server_message.startswith(c.GAME_OVER_MESSAGE):
                     server_message = server_message.replace(
                         c.GAME_OVER_MESSAGE, "")
-                    print(server_message)
+                    print(f"{c.COLOR_BLUE}{server_message}{c.COLOR_RESET}")
                     self.transition_state('looking_for_server')
                     return
 

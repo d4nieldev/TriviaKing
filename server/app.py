@@ -6,6 +6,7 @@ import random
 
 from questions import QUESTIONS
 import constants as c
+import statistic as stats
 
 
 GAME_STARTED_CONDITION: threading.Condition = threading.Condition()
@@ -24,6 +25,9 @@ class ClientHandler:
         self.answer: bool = None
         self.correct: bool = None
         self.in_game: bool = True
+
+        # init the stat class
+        self.stats: stats.Statistic = stats.Statistic()
 
     def start(self):
         self.thread.start()
@@ -225,12 +229,16 @@ def send_game_over_message(winner: str):
             msg = None
             if ch.in_game:
                 msg = c.GAME_OVER_MESSAGE + "You are the winner!"
+                # add the winner to the stats
+                ch.stats.add_player_win(ch.name)
             else:
                 msg = c.GAME_OVER_MESSAGE + f"The winner is: {winner}"
 
             ch.socket.sendall(msg.encode())
 
         print(f"Game Over! The winner is: {winner}")
+        
+
 
 
 def listen(server_port: int = 0) -> None:
