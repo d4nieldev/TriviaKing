@@ -7,7 +7,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 3. Run from 2 computers, not with self IP (Guy + Dani) 
 4. Error handeling - disconnection of client? (Dani)
 5. Server needs to start over after game concludes (Dani)
-6. Test if client type not P or B - loop prevails? (Shahar)
+6. !!DONE!! Test if client type not P or B - loop prevails? (Shahar)
 7. Add "quit" point to the server - no more new games - max #games (Dani)
 8. Make sure players stay in the game (not disconnecting) once a game is over (Dani)
 9. Finish data structure for results of the games - global for the server (Guy)

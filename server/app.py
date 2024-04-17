@@ -61,6 +61,7 @@ class ClientHandler:
                     response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
                 except ConnectionAbortedError:
                     self.disconnect()
+                    break
                 if response == 0:
                     self.disconnect()
                 answer = response.decode()
