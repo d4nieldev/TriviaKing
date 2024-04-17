@@ -34,6 +34,12 @@ class ClientHandler:
     def exit_game(self):
         self.in_game = False
 
+    def disconnect(self):
+        # client disconnected
+        print(f"{self.name} disconnected.")
+        self.exit_game()
+        return
+
     def handle(self):
         # get client name
         message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
@@ -54,13 +60,10 @@ class ClientHandler:
                 try:
                     response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
                 except ConnectionAbortedError:
-                    
+                    self.disconnect()
                 print(f"recieve from {self.name}'s answer...")
                 if response == 0:
-                    # client disconnected
-                    print(f"{self.name} disconnected.")
-                    self.exit_game()
-                    return
+                    self.disconnect()
                 answer = response.decode()
                 if answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                     error_message = c.ERROR_MESSAGE
@@ -83,7 +86,6 @@ class ClientHandler:
                 # reset answer and correct fields
                 self.answer = None
                 self.correct = None
-
 
 
 SEND_BROADCAST: bool = False
@@ -140,7 +142,6 @@ def handle_new_connection(client_socket: socket.socket, client_address: tuple) -
     CLIENTS_HANDLERS.append(handler)
 
 
-
 def handle_incoming_connections(server_socket: socket.socket) -> None:
     # Accept incoming connections
     while True:
@@ -165,7 +166,7 @@ def send_welcome_message() -> None:
     welcome_message += '==\n'
 
     # send welcome message to every player
-    for client_handler in CLIENTS_HANDLERS:# im gay
+    for client_handler in CLIENTS_HANDLERS:  # im gay
         client_handler.socket.sendall(welcome_message.encode())
 
     time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
@@ -224,9 +225,6 @@ def game_loop():
         send_game_over_message(winner=winner_client_handler.name)
 
 
-
-
-
 def send_game_over_message(winner: str):
     if winner is None:
         # send all client message with the winner
@@ -247,8 +245,6 @@ def send_game_over_message(winner: str):
             ch.socket.sendall(msg.encode())
 
         print(f"Game Over! The winner is: {winner}")
-        
-
 
 
 def listen(server_port: int = 0) -> None:
