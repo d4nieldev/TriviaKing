@@ -14,6 +14,10 @@ GAME_STARTED: bool = False
 WAIT_FOR_ANSWERS_CONDITION: threading.Condition = threading.Condition()
 ANSWERS_CHECKED_CONDITION: threading.Condition = threading.Condition()
 
+# init the class stats
+server_stats = stats.Statistic()
+
+
 
 class ClientHandler:
     def __init__(self, client_socket: socket.socket):
@@ -24,9 +28,6 @@ class ClientHandler:
         self.answer: bool = None
         self.correct: bool = None
         self.in_game: bool = True
-
-        # init the stat class
-        self.stats: stats.Statistic = stats.Statistic()
 
     def recieve_name(self):
         # get client name
@@ -41,7 +42,7 @@ class ClientHandler:
 
     def disconnect(self):
         # client disconnected
-        print(f"{self.name} disconnected.")
+        print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
         self.exit_game()
         return
 
@@ -198,7 +199,7 @@ def game_loop():
             client_handler.socket.sendall(
                 (c.QUESTION_MESSAGE + question).encode())
 
-        print(f"Sent question: {question}. The answer is: {answer}")
+        print(f"{c.COLOR_BLUE}Sent question: {question}. The answer is: {answer}{c.COLOR_RESET}")
 
         # wait for answers
         with WAIT_FOR_ANSWERS_CONDITION:
@@ -213,7 +214,7 @@ def game_loop():
             for client_handler in in_game_players:
                 client_handler.correct = client_handler.answer == answer
                 if not client_handler.correct:
-                    print(f"{client_handler.name} got the answer wrong.")
+                    print(f"{c.COLOR_RED}{client_handler.name} got the answer wrong.{c.COLOR_RESET}")
                     client_handler.exit_game()
                 
             # filter players
@@ -233,9 +234,9 @@ def game_loop():
 
 def send_game_over_message(winner: str):
     if winner is None:
-        print("Game Over! (no winner)")
+        print(f"{c.COLOR_GREEN}Game Over! (no winner){c.COLOR_RESET}")
     else:
-        print(f"Game Over! The winner is: {winner}")
+        print(f"{c.COLOR_GREEN}Game Over! The winner is: {winner}{c.COLOR_RESET}")
         
     for ch in CLIENTS_HANDLERS:
         if winner is None:
@@ -246,7 +247,8 @@ def send_game_over_message(winner: str):
             if ch.in_game:
                 msg = c.GAME_OVER_MESSAGE + "You are the winner!"
                 # add the winner to the stats
-                ch.stats.add_player_win(ch.name)
+                server_stats.add_player_win(winner)
+
             else:
                 msg = c.GAME_OVER_MESSAGE + f"The winner is: {winner}"
 
@@ -279,6 +281,9 @@ def listen(server_port: int = 0) -> None:
         send_welcome_message()
         game_loop()
 
+        # implement print_player_wins in stats
+        server_stats.print_player_wins()
+        
 
 if __name__ == '__main__':
     # listen on a random port

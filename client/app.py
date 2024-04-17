@@ -94,7 +94,7 @@ class Client:
             print("Connected to the server and sent player name.")
             self.transition_state('game_mode')
         except Exception as e:
-            print(f"Failed to connect: {e}")
+            print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
             self.disconnect()
 
     def game_mode(self):
@@ -118,11 +118,11 @@ class Client:
             if server_message.startswith(c.WELCOME_MESSAGE):
                 server_message = server_message.replace(
                     c.WELCOME_MESSAGE, "")
-                print(server_message)
+                print(f"{c.COLOR_GREEN}server_message{c.COLOR_RESET}")
             elif server_message.startswith(c.ERROR_MESSAGE):
                 server_message = server_message.replace(
                     c.ERROR_MESSAGE, "")
-                print("Error: " + server_message)
+                print(f"{c.COLOR_RED}Error: {server_message}{c.COLOR_RESET}")
                 server_message = last_question
                 was_error = True
             elif server_message.startswith(c.QUESTION_MESSAGE):
@@ -142,12 +142,12 @@ class Client:
     def disconnect(self):
         if self.tcp_socket:
             self.tcp_socket.close()
-            print("Disconnected from server.")
+            print(f"{c.COLOR_RED}Disconnected from server.{c.COLOR_RESET}")
             self.tcp_socket = None
     
     def reconnect(self):
         self.disconnect()
-        self.transition_state('looking_for_server')
+        self.transition_state(f'{c.COLOR_BLUE}looking_for_server{c.COLOR_RESET}')
 
     def run(self):
         while True:
@@ -194,8 +194,8 @@ if __name__ == '__main__':
             break
 
         elif client_type == "p":
-            team_name = input("Enter player name: ").strip()
+            team_name = input(f"{c.COLOR_BLUE}Enter player name: {c.COLOR_RESET}").strip()
             create_player(team_name=team_name, bot=False)
             break
         else:
-            print('Invalid player choice. Try better next time.')
+            print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')

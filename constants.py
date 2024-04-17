@@ -34,3 +34,5 @@ COLOR_BLUE = "\033[94m"
 COLOR_MAGENTA = "\033[95m"
 COLOR_CYAN = "\033[96m"
 
+# STATS 
+FILE_PATH_WINS = 'player_wins.txt'
