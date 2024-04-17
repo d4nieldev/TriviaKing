@@ -37,6 +37,7 @@ class Client:
             ans = random.choice(c.TRUE_ANSWERS + c.FALSE_ANSWERS)
             print(f"{self.team_name} Answer: {ans}")
         else:
+            # input_thread.start()
             ans = input("Answer: ").strip()
         return ans
 
@@ -97,54 +98,56 @@ class Client:
             self.disconnect()
 
     def game_mode(self):
-        try:
-            last_question = None
-            was_error = False
-            while self.state == 'game_mode':
-                if not was_error:
+        last_question = None
+        was_error = False
+        while self.state == 'game_mode':
+            if not was_error:
+                try:
                     data = self.tcp_socket.recv(self.BUFFER_SIZE)
-                else:
-                    data = last_question.encode()
-                    was_error = False
+                    # input_thread.stop
+                except ConnectionAbortedError:
+                    self.reconnect()
+            else:
+                data = last_question.encode()
+                was_error = False
 
-                if data == 0:
-                    print("Server disconnected.")
-                    self.transition_state('looking_for_server')
-                    return
+            if data == 0:
+                self.disconnect()
 
-                server_message = data.decode()
-                if server_message.startswith(c.WELCOME_MESSAGE):
-                    server_message = server_message.replace(
-                        c.WELCOME_MESSAGE, "")
-                    print(server_message)
-                elif server_message.startswith(c.ERROR_MESSAGE):
-                    server_message = server_message.replace(
-                        c.ERROR_MESSAGE, "")
-                    print("Error: " + server_message)
-                    server_message = last_question
-                    was_error = True
-                elif server_message.startswith(c.QUESTION_MESSAGE):
-                    last_question = server_message
-                    server_message = server_message.replace(
-                        c.QUESTION_MESSAGE, "")
-                    print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
-                    msg = self.answer_the_bloody_question()
-                    self.tcp_socket.sendall(msg.encode())
-                elif server_message.startswith(c.GAME_OVER_MESSAGE):
-                    server_message = server_message.replace(
-                        c.GAME_OVER_MESSAGE, "")
-                    print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
-                    self.transition_state('looking_for_server')
-                    return
-
-        finally:
-            self.disconnect()
+            server_message = data.decode()
+            if server_message.startswith(c.WELCOME_MESSAGE):
+                server_message = server_message.replace(
+                    c.WELCOME_MESSAGE, "")
+                print(server_message)
+            elif server_message.startswith(c.ERROR_MESSAGE):
+                server_message = server_message.replace(
+                    c.ERROR_MESSAGE, "")
+                print("Error: " + server_message)
+                server_message = last_question
+                was_error = True
+            elif server_message.startswith(c.QUESTION_MESSAGE):
+                last_question = server_message
+                server_message = server_message.replace(
+                    c.QUESTION_MESSAGE, "")
+                print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
+                msg = self.answer_the_bloody_question()
+                self.tcp_socket.sendall(msg.encode())
+            elif server_message.startswith(c.GAME_OVER_MESSAGE):
+                server_message = server_message.replace(
+                    c.GAME_OVER_MESSAGE, "")
+                print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
+                self.reconnect()
+                return
 
     def disconnect(self):
         if self.tcp_socket:
             self.tcp_socket.close()
             print("Disconnected from server.")
             self.tcp_socket = None
+    
+    def reconnect(self):
+        self.disconnect()
+        self.transition_state('looking_for_server')
 
     def run(self):
         while True:
