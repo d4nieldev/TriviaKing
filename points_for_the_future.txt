@@ -1,5 +1,33 @@
-1. '1' may be an integer
-2. use LLM for client bot (Mixtral)
-3. client - two threads: one for listening to keyboard, other for listening to TCP connection
-4. If message format is invalid - do we disconnect the UDP?
-5. Error handeling - disconnection of client?
+####################################################
+DO NOT DELETE TASKS, MARK AS !!DONE!!
+####################################################
+
+1. Add colors to Client and Server prints (Guy)
+2. Fix connection from MAC? (Dani)
+3. Run from 2 computers, not with self IP (Guy + Dani) 
+4. Error handeling - disconnection of client? (Dani)
+5. Server needs to start over after game concludes (Dani)
+6. Test if client type not P or B - loop prevails? (Shahar)
+7. Add "quit" point to the server - no more new games - max #games (Dani)
+8. Make sure players stay in the game (not disconnecting) once a game is over (Dani)
+9. Finish data structure for results of the games - global for the server (Guy)
+10. Mark where to calculate and present comments (Dani)
+11. Discriptive statistics for the players participated - Tournament. Table ASCII art (Shahar)
+12. Make sure valid player names are printed in welcome message (Dani)
+13. Add player name to to all client messages (Shahar)
+14. Add player name to welcome message (Dani)
+15. If everybody are wrong - generate another question (no game over) (Dani)
+16. If answer was not recieved within 10 sec, player is disqualified - game over message (Dani)
+17. 2 threads in the client - 1 waits for input. worker is a function with input.
+    second thread is the main. Just add thread.start() when waits for input and
+    thread.stop() / disconnect() when a new message from server was recieved - line 106, tcp.socket.rcv (Shahar)
+18. Test all edge cases of disconnection to client / server / network (ALL)
+19. Team Name should hard coded in the client (global). Create list and change in __main__(Shahar)
+20. "Work with any client and any server" - What? Ask around (Shahar)
+21. Add FUCKING documentation YA PIECES OF SHIT (ALL)
+22. Replace all key and strings and const num in Client with constants (Shahar)
+23. Replace all key and strings and const num in Server with constants (Guy + Dani)
+24. "Network code is isolated to a single network" - What? Ask around (Shahar)
+
+
+

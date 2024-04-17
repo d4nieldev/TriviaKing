@@ -28,6 +28,11 @@ class ClientHandler:
         # init the stat class
         self.stats: stats.Statistic = stats.Statistic()
 
+    def recieve_name(self):
+        # get client name
+        message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
+        self.name = message.split(c.CLIENT_NAME_TERMINATION)[0]
+        
     def start(self):
         self.thread.start()
 
@@ -41,10 +46,6 @@ class ClientHandler:
         return
 
     def handle(self):
-        # get client name
-        message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
-        self.name = message.split(c.CLIENT_NAME_TERMINATION)[0]
-
         # wait for game to start
         with GAME_STARTED_CONDITION:
             while not GAME_STARTED:
@@ -161,8 +162,12 @@ def send_welcome_message() -> None:
         welcome_message += f'Player {i + 1}: {player_name}\n'
     welcome_message += '==\n'
 
+    # recieve names from all clients
+    for client_handler in CLIENTS_HANDLERS:
+        client_handler.recieve_name()
+        
     # send welcome message to every player
-    for client_handler in CLIENTS_HANDLERS:  # im gay
+    for client_handler in CLIENTS_HANDLERS:
         client_handler.socket.sendall(welcome_message.encode())
 
     time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
