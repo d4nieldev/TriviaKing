@@ -56,12 +56,10 @@ class ClientHandler:
             # get answer from client
             answer = None
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
-                print(f"WAITING from {self.name}'s answer...")
                 try:
                     response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
                 except ConnectionAbortedError:
                     self.disconnect()
-                print(f"recieve from {self.name}'s answer...")
                 if response == 0:
                     self.disconnect()
                 answer = response.decode()
@@ -76,9 +74,7 @@ class ClientHandler:
 
             # wait for all answers to be checked
             with ANSWERS_CHECKED_CONDITION:
-                print(f"before wait {self.answer}")
                 ANSWERS_CHECKED_CONDITION.wait()
-                print(f"after wait {self.answer}")
 
                 if not self.correct:
                     break
@@ -213,10 +209,14 @@ def game_loop():
                 if not client_handler.correct:
                     print(f"{client_handler.name} got the answer wrong.")
                     client_handler.exit_game()
+                
+            # filter players
+            in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
+            
+            if len(in_game_players) <= 1:
+                GAME_STARTED = False
             ANSWERS_CHECKED_CONDITION.notify_all()
 
-        # filter players
-        in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
 
     if len(in_game_players) == 0:
         send_game_over_message(winner=None)
@@ -227,13 +227,15 @@ def game_loop():
 
 def send_game_over_message(winner: str):
     if winner is None:
-        # send all client message with the winner
-        for ch in CLIENTS_HANDLERS:
-            ch.socket.sendall((c.GAME_OVER_MESSAGE + "No winner").encode())
         print("Game Over! (no winner)")
     else:
+        print(f"Game Over! The winner is: {winner}")
+        
+    for ch in CLIENTS_HANDLERS:
+        if winner is None:
         # send all client message with the winner
-        for ch in CLIENTS_HANDLERS:
+            ch.socket.sendall((c.GAME_OVER_MESSAGE + "No winner").encode())
+        else:
             msg = None
             if ch.in_game:
                 msg = c.GAME_OVER_MESSAGE + "You are the winner!"
@@ -243,8 +245,7 @@ def send_game_over_message(winner: str):
                 msg = c.GAME_OVER_MESSAGE + f"The winner is: {winner}"
 
             ch.socket.sendall(msg.encode())
-
-        print(f"Game Over! The winner is: {winner}")
+        ch.disconnect()
 
 
 def listen(server_port: int = 0) -> None:
