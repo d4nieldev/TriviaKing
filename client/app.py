@@ -177,7 +177,7 @@ if __name__ == '__main__':
         if client_type == "b":
             # Random number of bots will join the game
             num_bots = random.randint(1, 7)
-            num_bots = 2  # Random number of bots will join the
+            # num_bots = 2  # Constant number of bots
             threads = []
             for i in range(num_bots):
                 thread = threading.Thread(
