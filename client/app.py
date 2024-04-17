@@ -4,6 +4,7 @@ import random
 import struct
 import threading
 
+BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 
 class Client:
     def __init__(self, team_name="Team 1", bot=False):
@@ -24,14 +25,15 @@ class Client:
     def generate_bot_name(cls):
         while True:
             random_number = random.randint(1, 99999999999)  # Generate a random number
-            if random_number not in c.BOT_USED_NUMBERS:
-                c.BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
+            if random_number not in BOT_USED_NUMBERS:
+                BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
                 return f"BOT_#{random_number}"  # Return the unique bot team name
     
     def answer_the_bloody_question(self):
         if self.bot:
             # Random answer can be replaced with any chatbot API, but we are poor
-            ans = random.choice(list(c.TRUE_ANSWERS.union(c.FALSE_ANSWERS)))
+            ans = random.choice(c.TRUE_ANSWERS + c.FALSE_ANSWERS)
+            print(f"Bot Answer: {ans}")
         else:
             ans = input("Answer: ").strip()
         return ans
@@ -127,14 +129,10 @@ class Client:
                     print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
                     msg = self.answer_the_bloody_question()
                     self.tcp_socket.sendall(msg.encode())
-                elif server_message.startswith(c.BYE_MESSAGE):
-                    server_message = server_message.replace(
-                        c.BYE_MESSAGE, "")
-                    print(f"{c.COLOR_RED}{server_message}{c.COLOR_RESET}")
                 elif server_message.startswith(c.GAME_OVER_MESSAGE):
                     server_message = server_message.replace(
                         c.GAME_OVER_MESSAGE, "")
-                    print(f"{c.COLOR_BLUE}{server_message}{c.COLOR_RESET}")
+                    print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
                     self.transition_state('looking_for_server')
                     return
 
@@ -174,10 +172,10 @@ def create_player(team_name = "", bot = False):
 
 if __name__ == '__main__':
     while True:
-        client_type = input("""Hello comrad! Press P if you want to sign in as a player. 
-                            Press B if you want a bot player to join the game""").lower().strip()
+        client_type = input("""\nHello comrad!\nPress P if you want to sign in as a player.\nPress B if you want a bot player to join the game:\n""").lower().strip()
         if client_type == "b":
             num_bots = random.randint(1, 7)  # Random number of bots will join the game
+            num_bots = 2  # Random number of bots will join the 
             threads = []
             for i in range(num_bots):
                 thread = threading.Thread(target=create_player, args=("", True))

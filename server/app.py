@@ -13,7 +13,6 @@ GAME_STARTED_CONDITION: threading.Condition = threading.Condition()
 GAME_STARTED: bool = False
 WAIT_FOR_ANSWERS_CONDITION: threading.Condition = threading.Condition()
 ANSWERS_CHECKED_CONDITION: threading.Condition = threading.Condition()
-ANSWERS_CHECKED: bool = False
 
 
 class ClientHandler:
@@ -51,7 +50,12 @@ class ClientHandler:
             # get answer from client
             answer = None
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
-                response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
+                print(f"WAITING from {self.name}'s answer...")
+                try:
+                    response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
+                except ConnectionAbortedError:
+                    
+                print(f"recieve from {self.name}'s answer...")
                 if response == 0:
                     # client disconnected
                     print(f"{self.name} disconnected.")
@@ -69,15 +73,17 @@ class ClientHandler:
 
             # wait for all answers to be checked
             with ANSWERS_CHECKED_CONDITION:
-                while not ANSWERS_CHECKED:
-                    ANSWERS_CHECKED_CONDITION.wait()
+                print(f"before wait {self.answer}")
+                ANSWERS_CHECKED_CONDITION.wait()
+                print(f"after wait {self.answer}")
 
                 if not self.correct:
                     break
 
-            # reset answer and correct fields
-            self.answer = None
-            self.correct = None
+                # reset answer and correct fields
+                self.answer = None
+                self.correct = None
+
 
 
 SEND_BROADCAST: bool = False
@@ -132,7 +138,7 @@ def handle_new_connection(client_socket: socket.socket, client_address: tuple) -
     print("New connection from ", client_address)
     handler: ClientHandler = ClientHandler(client_socket=client_socket)
     CLIENTS_HANDLERS.append(handler)
-    handler.start()
+
 
 
 def handle_incoming_connections(server_socket: socket.socket) -> None:
@@ -159,7 +165,7 @@ def send_welcome_message() -> None:
     welcome_message += '==\n'
 
     # send welcome message to every player
-    for client_handler in CLIENTS_HANDLERS:
+    for client_handler in CLIENTS_HANDLERS:# im gay
         client_handler.socket.sendall(welcome_message.encode())
 
     time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
@@ -167,7 +173,8 @@ def send_welcome_message() -> None:
 
 def game_loop():
     global GAME_STARTED
-
+    for ch in CLIENTS_HANDLERS:
+        ch.start()
     # start the game
     GAME_STARTED = True
     with GAME_STARTED_CONDITION:
@@ -215,6 +222,9 @@ def game_loop():
     else:
         winner_client_handler = in_game_players[0]
         send_game_over_message(winner=winner_client_handler.name)
+
+
+
 
 
 def send_game_over_message(winner: str):
