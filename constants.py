@@ -12,6 +12,30 @@ BROADCAST_MESSAGE_TYPE = 0x2
 CLIENT_NAME_TERMINATION = '\n'
 CLIENT_NO_JOIN_TIMEOUT_SEC = 10
 
+CLIENT_STATE_LOOKING_FOR_SERVER = 'looking_for_server'
+CLIENT_STATE_CONNECTING_TO_SERVER = 'connecting_to_server'
+CLIENT_STATE_GAME_MODE = 'game_mode'
+MIN_NUM_BOTS = 1
+MAX_NUM_BOTS = 7
+CLIENT_TEAM_NAMES = [
+    "Hateful Brains",
+    "Bill's Quizmasters",
+    "Trivia Reservoirs",
+    "Inglourious Know-it-Alls",
+    "Cheesy Royale Quizzers",
+    "Cult Fiction Fact-Checkers",
+    "Bloody Brilliant Minds",
+    "Fellowship of the Quiz",
+    "The Godfather’s Godchildren",
+    "Shutter Island Shapeshifters",
+    "Sherlocked Minds",
+    "Quizteros of Westeros",
+    "The Big Bang Queries",
+    "Stranger Thinkers",
+    "Breaking Bads",
+    "Peaky Minders"
+]
+
 SERVER_NAME = 'NovaBeach'
 SERVER_NO_ANSWER_TIMEOUT_SEC = 10
 SERVER_BROADCAST_PERIOD_SEC = 1

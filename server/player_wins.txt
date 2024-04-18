@@ -8,3 +8,4 @@ Grace:11
 Henry:13
 Isabel:16
 Jack:19
+Inglourious Know-it-Alls:2

@@ -5,13 +5,14 @@ import struct
 import threading
 
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
+TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
 
 
 class Client:
-    def __init__(self, team_name="Team 1", bot=False):
+    def __init__(self, bot=False):
         self.server_port = None
         self.BUFFER_SIZE = 1024  # Assuming a buffer size value
-        self.team_name = self.generate_bot_name() if bot else team_name
+        self.team_name = self.generate_bot_name() if bot else self.generate_team_name()
         self.BROADCAST_MSG = f'me llamo {self.team_name} and I want to play, pandejo!'
         self.tcp_socket = None
         self.server_ip = None
@@ -19,7 +20,10 @@ class Client:
         self.bot = bot
 
         # States: looking_for_server, connecting_to_server, game_mode
-        self.state = 'looking_for_server'
+        self.state = c.CLIENT_STATE_LOOKING_FOR_SERVER
+        
+        # Input recieved by manual player
+        self.answer = None
 
     @classmethod
     def generate_bot_name(cls):
@@ -30,20 +34,40 @@ class Client:
                 BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
                 # Return the unique bot team name
                 return f"BOT_#{random_number}"
+    
+    @classmethod
+    def generate_team_name(cls):
+        while True:
+            random_name = random.choice(c.CLIENT_TEAM_NAMES)  # Generate a random name
+            if random_name not in TEAM_USED_NAMES:
+                TEAM_USED_NAMES.add(random_name)  # Mark this number as used
+                # Return the unique bot team name
+                return random_name
 
     def answer_the_bloody_question(self):
+        def get_input():
+            ''' Thread worker'''
+            self.answer = input("Answer: ").strip()
+        
         if self.bot:
             # Random answer can be replaced with any chatbot API, but we are poor
             ans = random.choice(c.TRUE_ANSWERS + c.FALSE_ANSWERS)
             print(f"{self.team_name} Answer: {ans}")
+            return ans
         else:
             # input_thread.start()
-            ans = input("Answer: ").strip()
+            input_thread = threading.Thread(target=get_input)
+            input_thread.start()
+            input_thread.join()
+            
+            ans = self.answer
+            self.answer = None                
+            # ans = input("Answer: ").strip()
         return ans
 
     def transition_state(self, new_state):
         self.state = new_state
-        print(f"Transitioned to state: {new_state}")
+        print(f"{self.team_name} transitioned to state: {new_state}")
 
     def parse_broadcast_message(self, data: bytes):
         # Expected format of the received packet
@@ -59,12 +83,9 @@ class Client:
 
         # Verify the magic cookie and message type
         if magic_cookie != c.BROADCAST_MAGIC_COOKIE or message_type != c.BROADCAST_MESSAGE_TYPE:
-            raise ValueError("Invalid packet received")
+            raise ValueError(f"Invalid packet received by {self.team_name}")
 
-        return {
-            "server_name": server_name,
-            "server_port": server_port
-        }
+        return server_name, server_port
 
     def find_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
@@ -72,27 +93,26 @@ class Client:
             # Bind to the broadcast port
             udp_socket.bind(('', c.BROADCAST_PORT))
             try:
-                print("Listening for server broadcasts...")
+                print(f"{self.team_name} is listening for server broadcasts...")
                 data, addr = udp_socket.recvfrom(self.BUFFER_SIZE)
-                res = self.parse_broadcast_message(data)
-
                 self.server_ip = addr[0]
-                self.server_port = res['server_port']
-                self.server_name = res['server_name']
-                print(f"Received broadcast from {addr},"
+                
+                self.server_name,  self.server_port = self.parse_broadcast_message(data)
+
+                print(f"{self.team_name} Received broadcast from {addr},"
                       f" server name {self.server_name}")
-                self.transition_state('connecting_to_server')
+                self.transition_state(c.CLIENT_STATE_CONNECTING_TO_SERVER)
 
             except socket.timeout:
-                print("No server broadcast received.")
+                print(f"{c.COLOR_RED}[{self.team_name}]: No server broadcasts received.{c.COLOR_RESET}")
 
     def connect_to_server(self):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.tcp_socket.connect((self.server_ip, self.server_port))
             self.tcp_socket.send((self.team_name + '\n').encode())
-            print("Connected to the server and sent player name.")
-            self.transition_state('game_mode')
+            print(f"{self.team_name} connected to the server and sent player name.")
+            self.transition_state(c.CLIENT_STATE_GAME_MODE)
         except Exception as e:
             print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
             self.disconnect()
@@ -100,7 +120,7 @@ class Client:
     def game_mode(self):
         last_question = None
         was_error = False
-        while self.state == 'game_mode':
+        while self.state == c.CLIENT_STATE_GAME_MODE:
             if not was_error:
                 try:
                     data = self.tcp_socket.recv(self.BUFFER_SIZE)
@@ -142,24 +162,24 @@ class Client:
     def disconnect(self):
         if self.tcp_socket:
             self.tcp_socket.close()
-            print(f"{c.COLOR_RED}Disconnected from server.{c.COLOR_RESET}")
+            print(f"{c.COLOR_RED} {self.team_name} disconnected from server.{c.COLOR_RESET}")
             self.tcp_socket = None
     
     def reconnect(self):
         self.disconnect()
-        self.transition_state(f'{c.COLOR_BLUE}looking_for_server{c.COLOR_RESET}')
+        self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
 
     def run(self):
         while True:
-            if self.state == 'looking_for_server':
+            if self.state == c.CLIENT_STATE_LOOKING_FOR_SERVER:
                 self.find_server()
-            elif self.state == 'connecting_to_server':
+            elif self.state == c.CLIENT_STATE_CONNECTING_TO_SERVER:
                 self.connect_to_server()
-            elif self.state == 'game_mode':
+            elif self.state == c.CLIENT_STATE_GAME_MODE:
                 self.game_mode()
 
 
-def create_player(team_name="", bot=False):
+def create_player(bot=False):
     '''
     External method to create players, both human and bots, 
     in order to activate as a thread worker if necessary.
@@ -168,7 +188,8 @@ def create_player(team_name="", bot=False):
         client = Client(bot=True)
         client.run()
     else:
-        client = Client(team_name=team_name, bot=False)
+        client = Client(bot=False)
+        print(f"{c.COLOR_BLUE}Your team name is: {client.team_name}{c.COLOR_RESET}")
         client.run()
     return
 
@@ -176,15 +197,15 @@ def create_player(team_name="", bot=False):
 if __name__ == '__main__':
     while True:
         client_type = input(
-            """\nHello comrad!\nPress P if you want to sign in as a player.\nPress B if you want a bot player to join the game:\n""").lower().strip()
+            """\nHello comrad!\nPress P if you want to sign in as a player.\nPress B if you want bot players to join the game:\n""").lower().strip()
         if client_type == "b":
             # Random number of bots will join the game
-            num_bots = random.randint(1, 7)
+            num_bots = random.randint(c.MIN_NUM_BOTS, c.MAX_NUM_BOTS)
             # num_bots = 2  # Constant number of bots
             threads = []
             for i in range(num_bots):
                 thread = threading.Thread(
-                    target=create_player, args=("", True))
+                    target=create_player, args=(True))
                 threads.append(thread)
                 thread.start()
 
@@ -194,8 +215,7 @@ if __name__ == '__main__':
             break
 
         elif client_type == "p":
-            team_name = input(f"{c.COLOR_BLUE}Enter player name: {c.COLOR_RESET}").strip()
-            create_player(team_name=team_name, bot=False)
+            create_player(bot=False)
             break
         else:
             print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
