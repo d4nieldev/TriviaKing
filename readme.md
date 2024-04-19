@@ -12,8 +12,9 @@
     - install dependencies: `pip install -r requirements.txt`
 
 3. Add PYTHONPATH environment variable that points to the project directory:
-    - On windows PowerShell: `$env:PYTHONPATH = "[path_to_TriviaKing]"`
-    - On mac or linux terminal: `export PYTHONPATH="[path_to_TriviaKing]"`
+    - On Windows PowerShell: `$env:PYTHONPATH = "[path_to_TriviaKing]"`
+    - On Command Line: `set PYTHONPATH=[path_to_TriviaKing]`
+    - On MAC or Linux terminal: `export PYTHONPATH="[path_to_TriviaKing]"`
 
 For adding libraries to requirements: `pip freeze > requirements.txt`
 

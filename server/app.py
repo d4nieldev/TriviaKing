@@ -158,7 +158,8 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        # sock.bind((ip_address, c.BROADCAST_PORT))
+        # Comment for MAC (shit), Uncomment for Windows (best)
+        sock.bind((ip_address, c.BROADCAST_PORT))
         while SEND_BROADCAST:
             sock.sendto(udp_packet, broadcast_address)
             time.sleep(c.SERVER_BROADCAST_PERIOD_SEC)

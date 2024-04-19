@@ -5,6 +5,7 @@ import struct
 import threading
 import select
 import sys
+import msvcrt
 
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
@@ -81,7 +82,12 @@ class Client:
 
     def find_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
-            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            try:
+                # Different commands between MAC and Windows
+                udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except AttributeError:
+                udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
             # Bind to the broadcast port
             udp_socket.bind(('', c.BROADCAST_PORT))
             try:
@@ -125,14 +131,30 @@ class Client:
             except OSError:
                 break
 
+    # def wait_for_input(self):
+    #     self.received_new_message.clear()
+    #     while not self.received_new_message.is_set():
+    #         # Use select to check if there is input available without blocking
+    #         input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
+    #         if input_ready:
+    #             # Read user input
+    #             return sys.stdin.readline().rstrip()
+    #     return None
+    
     def wait_for_input(self):
         self.received_new_message.clear()
         while not self.received_new_message.is_set():
-            # Use select to check if there is input available without blocking
-            input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
-            if input_ready:
-                # Read user input
-                return sys.stdin.readline().rstrip()
+            try:
+                # Use select to check if there is input available without blocking
+                input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
+                if input_ready:
+                    # Read user input
+                    return sys.stdin.readline().rstrip()
+            except OSError:
+                # Handle the case for Windows when select is used with stdin
+                if msvcrt.kbhit():
+                    return sys.stdin.readline().rstrip()
+
         return None
 
     def game_mode(self):
