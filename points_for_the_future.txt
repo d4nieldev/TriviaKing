@@ -2,7 +2,7 @@
 DO NOT DELETE TASKS, MARK AS !!DONE!!
 ####################################################
 
-1. Add colors to Client and Server prints (Guy)
+1. !!DONE!! Add colors to Client and Server prints (Guy)
 2. Fix connection from MAC? (Dani)
 3. Run from 2 computers, not with self IP (Guy + Dani) 
 4. Error handeling - disconnection of client? (Dani)
@@ -10,7 +10,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 6. !!DONE!! Test if client type not P or B - loop prevails? (Shahar)
 7. Add "quit" point to the server - no more new games - max #games (Dani)
 8. Make sure players stay in the game (not disconnecting) once a game is over (Dani)
-9. Finish data structure for results of the games - global for the server (Guy)
+9. Finish data structure for results of the games - global for the server (Shahar)
 10. Mark where to calculate and present comments (Dani)
 11. Discriptive statistics for the players participated - Tournament. Table ASCII art (Shahar)
 12. Make sure valid player names are printed in welcome message (Dani)
@@ -18,7 +18,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 14. Add player name to welcome message (Dani)
 15. If everybody are wrong - generate another question (no game over) (Dani)
 16. If answer was not recieved within 10 sec, player is disqualified - game over message (Dani)
-17. 2 threads in the client - 1 waits for input. worker is a function with input.
+17. !!DONE!! 2 threads in the client - 1 waits for input. worker is a function with input.
     second thread is the main. Just add thread.start() when waits for input and
     thread.stop() / disconnect() when a new message from server was recieved - line 106, tcp.socket.rcv (Shahar)
     - I added the input within a thread, but I see that the server is not sending anything after 10 sec. Is it already working? (Dani)
@@ -31,6 +31,6 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 24. "Network code is isolated to a single network" - What? Ask around (Shahar)
 25. You cannot add more then len(c.CLIENT_TEAM_NAMES) manual players to the game. Maybe that should be stated somewhere (Dani)
 26. If invalid answer inputed - is it not automatically terminating the player? I pressed nothing and the game stuck (Dani)
-
+27. Set bot difficulity modes (dumb as fuck - 0.3, average - 0.5, smartass - 0.7) (Shahar)
 
 

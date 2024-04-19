@@ -1,13 +1,3 @@
-Alice:16
-Bob:18
-Charlie:12
-David:14
-Eve:20
-Frank:17
-Grace:11
-Henry:13
-Isabel:16
-Jack:19
 Inglourious Know-it-Alls:4
 Stranger Thinkers:4
 Fellowship of the Quiz:1
@@ -15,3 +5,4 @@ Sherlocked Minds:1
 Bloody Brilliant Minds:2
 Quizteros of Westeros:2
 The Big Bang Queries:1
+BOT_#99210090130:1

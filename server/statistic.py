@@ -67,7 +67,7 @@ class Statistic:
     # update the player_wins file
     def update_file(self):
         with open(c.FILE_PATH_WINS, 'w') as file:
-            for player in self.player_wins:
-                file.write(f"{player}:{self.player_wins[player]}\n")
+            for player, score in self.player_wins.items():
+                file.write(f"{player}:{score}\n")
 
 
