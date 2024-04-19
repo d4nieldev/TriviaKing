@@ -41,10 +41,11 @@ class ClientHandler:
         self.in_game = False
 
     def disconnect(self):
-        # client disconnected
-        print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
-        self.exit_game()
-        return
+        if self.in_game:
+            # client disconnected
+            print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
+            self.exit_game()
+            return
 
     def handle(self):
         # wait for game to start
@@ -60,11 +61,12 @@ class ClientHandler:
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                 try:
                     response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
-                except ConnectionAbortedError:
+                except Exception:
                     self.disconnect()
                     break
                 if response == 0:
                     self.disconnect()
+                    break
                 answer = response.decode()
                 if answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                     error_message = c.ERROR_MESSAGE
@@ -129,7 +131,7 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.bind((ip_address, c.BROADCAST_PORT))
+        # sock.bind((ip_address, c.BROADCAST_PORT))
         while SEND_BROADCAST:
             sock.sendto(udp_packet, broadcast_address)
             time.sleep(c.SERVER_BROADCAST_PERIOD_SEC)

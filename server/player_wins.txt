@@ -8,4 +8,10 @@ Grace:11
 Henry:13
 Isabel:16
 Jack:19
-Inglourious Know-it-Alls:2
+Inglourious Know-it-Alls:4
+Stranger Thinkers:4
+Fellowship of the Quiz:1
+Sherlocked Minds:1
+Bloody Brilliant Minds:2
+Quizteros of Westeros:2
+The Big Bang Queries:1

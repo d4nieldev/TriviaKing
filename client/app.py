@@ -3,10 +3,11 @@ import socket
 import random
 import struct
 import threading
+import select
+import sys
 
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
-
 
 class Client:
     def __init__(self, bot=False):
@@ -18,6 +19,9 @@ class Client:
         self.server_ip = None
         self.server_name = None
         self.bot = bot
+        self.server_messages = []
+        self.server_messages_pending_condition = threading.Condition()
+        self.received_new_message = threading.Event()
 
         # States: looking_for_server, connecting_to_server, game_mode
         self.state = c.CLIENT_STATE_LOOKING_FOR_SERVER
@@ -28,8 +32,7 @@ class Client:
     @classmethod
     def generate_bot_name(cls):
         while True:
-            random_number = random.randint(
-                1, 99999999999)  # Generate a random number
+            random_number = random.randint(1, 99999999999)  # Generate a random number
             if random_number not in BOT_USED_NUMBERS:
                 BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
                 # Return the unique bot team name
@@ -44,25 +47,14 @@ class Client:
                 # Return the unique bot team name
                 return random_name
 
-    def answer_the_bloody_question(self):
-        def get_input():
-            ''' Thread worker'''
-            self.answer = input("Answer: ").strip()
-        
+    def answer_the_bloody_question(self):        
         if self.bot:
             # Random answer can be replaced with any chatbot API, but we are poor
             ans = random.choice(c.TRUE_ANSWERS + c.FALSE_ANSWERS)
             print(f"{self.team_name} Answer: {ans}")
-            return ans
         else:
-            # input_thread.start()
-            input_thread = threading.Thread(target=get_input)
-            input_thread.start()
-            input_thread.join()
-            
-            ans = self.answer
-            self.answer = None                
-            # ans = input("Answer: ").strip()
+            ans = self.wait_for_input()
+            print(f"Answer: {ans}")
         return ans
 
     def transition_state(self, new_state):
@@ -89,7 +81,7 @@ class Client:
 
     def find_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
-            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             # Bind to the broadcast port
             udp_socket.bind(('', c.BROADCAST_PORT))
             try:
@@ -117,28 +109,53 @@ class Client:
             print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
             self.disconnect()
 
+    def listen_to_server_task(self):
+        while True:
+            try:
+                data = self.tcp_socket.recv(self.BUFFER_SIZE)
+                if data == 0:
+                    self.disconnect()
+                self.received_new_message.set()
+                with self.server_messages_pending_condition:
+                    self.server_messages.append(data)
+                    self.server_messages_pending_condition.notify()
+            except ConnectionAbortedError:
+                self.reconnect()
+                break
+            except OSError:
+                break
+
+    def wait_for_input(self):
+        self.received_new_message.clear()
+        while not self.received_new_message.is_set():
+            # Use select to check if there is input available without blocking
+            input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
+            if input_ready:
+                # Read user input
+                return sys.stdin.readline().rstrip()
+        return None
+
     def game_mode(self):
         last_question = None
         was_error = False
+
+        server_listener_thread = threading.Thread(target=self.listen_to_server_task)
+        server_listener_thread.start()
         while self.state == c.CLIENT_STATE_GAME_MODE:
             if not was_error:
-                try:
-                    data = self.tcp_socket.recv(self.BUFFER_SIZE)
-                    # input_thread.stop
-                except ConnectionAbortedError:
-                    self.reconnect()
+                with self.server_messages_pending_condition:
+                    if len(self.server_messages) == 0:
+                        self.server_messages_pending_condition.wait()
+                    data = self.server_messages.pop(0)
             else:
                 data = last_question.encode()
                 was_error = False
-
-            if data == 0:
-                self.disconnect()
 
             server_message = data.decode()
             if server_message.startswith(c.WELCOME_MESSAGE):
                 server_message = server_message.replace(
                     c.WELCOME_MESSAGE, "")
-                print(f"{c.COLOR_GREEN}server_message{c.COLOR_RESET}")
+                print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
             elif server_message.startswith(c.ERROR_MESSAGE):
                 server_message = server_message.replace(
                     c.ERROR_MESSAGE, "")
@@ -151,6 +168,8 @@ class Client:
                     c.QUESTION_MESSAGE, "")
                 print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
                 msg = self.answer_the_bloody_question()
+                if msg is None:
+                    continue
                 self.tcp_socket.sendall(msg.encode())
             elif server_message.startswith(c.GAME_OVER_MESSAGE):
                 server_message = server_message.replace(
@@ -205,7 +224,7 @@ if __name__ == '__main__':
             threads = []
             for i in range(num_bots):
                 thread = threading.Thread(
-                    target=create_player, args=(True))
+                    target=create_player, args=[True])
                 threads.append(thread)
                 thread.start()
 
