@@ -224,6 +224,9 @@ def round_loop() -> ClientHandler:
     round_start_message = c.GENERAL_MESSAGE + "Round started! Get ready..."
     for ch in CLIENTS_HANDLERS:
         ch.send_message(c.GENERAL_MESSAGE, round_start_message)
+    
+    # optinal - sleep to give players time to prepare
+    time.sleep(c.ROUND_PAUSE_SEC)
 
     GAME_RUNNING = True
 
@@ -279,8 +282,6 @@ def round_loop() -> ClientHandler:
         if len(correct_players) == 0:
             print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
         else:
-            print(f"{c.COLOR_MAGENTA}Eliminating incorrect players...{c.COLOR_RESET}")
-
             for client_handler in correct_players:
                 client_handler.correct = True
 

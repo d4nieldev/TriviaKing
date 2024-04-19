@@ -34,12 +34,29 @@ CLIENT_TEAM_NAMES = [
     "The Big Bang Queries",
     "Stranger Thinkers",
     "Breaking Bads",
-    "Peaky Minders"
+    "Peaky Minders",
+    "Quizzy Business",
+    "The Quizzical Geniuses",
+    "Brainy Bunch of Buffoons",
+    "The Quizzy Dream Team",
+    "Cerebral Assassins",
+    "The Brainstorming Bandits",
+    "The Quizzical Wizards",
+    "The Quizzy Connoisseurs",
+    "The Trivia Troopers",
+    "The Quiztastic Voyage",
+    "The Brainiac Bonanza",
+    "The Quizzy Mavericks",
+    "The Trivia Titans",
+    "The Mindbenders Society",
+    "The Quizzical Conundrums",
+    "The Brainiac Brigade"
 ]
 
 SERVER_NAME = 'NovaBeach'
 SERVER_NO_ANSWER_TIMEOUT_SEC = 20
 SERVER_BROADCAST_PERIOD_SEC = 1
+ROUND_PAUSE_SEC = 1
 TRUE_ANSWERS = ['Y', 'T', '1']
 FALSE_ANSWERS = ['N', 'F', '0']
 MIN_ROUNDS = 3
