@@ -302,6 +302,15 @@ def is_game_decided(rounds_results: list[ClientHandler]) -> bool:
     max_freq = max(counts.values())
     return list(counts.values()).count(max_freq) == 1
 
+def show_current_game_leaderboard(rounds_results: list[ClientHandler]) -> None:
+    counts = Counter(rounds_results)
+    leaderboard_message = "Current game leaderboard:\n"
+    for ch in CLIENTS_HANDLERS:
+        leaderboard_message += f"{ch.name}: {counts[ch]}\n"
+    print(leaderboard_message)
+    for ch in CLIENTS_HANDLERS:
+        ch.send_message(c.GENERAL_MESSAGE, leaderboard_message)
+
 
 def listen(server_port: int = 0) -> None:
     global SEND_BROADCAST
@@ -338,6 +347,7 @@ def listen(server_port: int = 0) -> None:
             for _ in range(c.MIN_ROUNDS):
                 round_winner = round_loop()
                 rounds_results.append(round_winner)
+                show_current_game_leaderboard(rounds_results)
             
             # play more rounds until game is decided
             while not is_game_decided(rounds_results):
@@ -345,6 +355,7 @@ def listen(server_port: int = 0) -> None:
                 print(f"{c.COLOR_YELLOW}Game is not decided, tiebreaker round!{c.COLOR_RESET}")
                 round_winner = round_loop()
                 rounds_results.append(round_winner)
+                show_current_game_leaderboard(rounds_results)
 
             # find majority element in rounds_results
             winner = max(set(rounds_results), key=rounds_results.count)

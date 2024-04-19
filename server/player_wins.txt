@@ -9,3 +9,4 @@ BOT_#99210090130:1
 None:1
 Shutter Island Shapeshifters:1
 Cheesy Royale Quizzers:1
+Cult Fiction Fact-Checkers:1
