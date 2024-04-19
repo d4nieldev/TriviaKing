@@ -109,7 +109,7 @@ class Client:
             print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
             self.disconnect()
 
-    def listen_to_server_task(self):
+    def listen_to_server(self):
         while True:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
@@ -117,7 +117,7 @@ class Client:
                     self.disconnect()
                 self.received_new_message.set()
                 with self.server_messages_pending_condition:
-                    self.server_messages.append(data)
+                    self.server_messages += data.decode().split(c.SERVER_MSG_TERMINATION)
                     self.server_messages_pending_condition.notify()
             except ConnectionAbortedError:
                 self.reconnect()
@@ -139,7 +139,7 @@ class Client:
         last_question = None
         was_error = False
 
-        server_listener_thread = threading.Thread(target=self.listen_to_server_task)
+        server_listener_thread = threading.Thread(target=self.listen_to_server)
         server_listener_thread.start()
         while self.state == c.CLIENT_STATE_GAME_MODE:
             if not was_error:
@@ -148,35 +148,32 @@ class Client:
                         self.server_messages_pending_condition.wait()
                     data = self.server_messages.pop(0)
             else:
-                data = last_question.encode()
+                data = last_question
                 was_error = False
 
-            server_message = data.decode()
+            server_message = data
             if server_message.startswith(c.WELCOME_MESSAGE):
-                server_message = server_message.replace(
-                    c.WELCOME_MESSAGE, "")
+                server_message = server_message.replace(c.WELCOME_MESSAGE, "")
                 print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
             elif server_message.startswith(c.ERROR_MESSAGE):
-                server_message = server_message.replace(
-                    c.ERROR_MESSAGE, "")
+                server_message = server_message.replace(c.ERROR_MESSAGE, "")
                 print(f"{c.COLOR_RED}Error: {server_message}{c.COLOR_RESET}")
                 server_message = last_question
                 was_error = True
             elif server_message.startswith(c.QUESTION_MESSAGE):
                 last_question = server_message
-                server_message = server_message.replace(
-                    c.QUESTION_MESSAGE, "")
+                server_message = server_message.replace(c.QUESTION_MESSAGE, "")
                 print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
-                msg = self.answer_the_bloody_question()
-                if msg is None:
-                    continue
-                self.tcp_socket.sendall(msg.encode())
+                ans = self.answer_the_bloody_question()
+                if ans is not None:
+                    self.tcp_socket.sendall(ans.encode())
             elif server_message.startswith(c.GAME_OVER_MESSAGE):
-                server_message = server_message.replace(
-                    c.GAME_OVER_MESSAGE, "")
+                server_message = server_message.replace(c.GAME_OVER_MESSAGE, "")
                 print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
                 self.reconnect()
-                return
+            elif server_message.startswith(c.GENERAL_MESSAGE):
+                server_message = server_message.replace(c.GENERAL_MESSAGE, "")
+                print(f"{c.COLOR_YELLOW}{server_message}{c.COLOR_RESET}")
 
     def disconnect(self):
         if self.tcp_socket:

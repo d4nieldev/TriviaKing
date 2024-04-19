@@ -3,64 +3,85 @@ import threading
 import struct
 import time
 import random
+import select
+from collections import Counter
 
 from questions import QUESTIONS
 import constants as c
 import statistic as stats
 
 
-GAME_STARTED_CONDITION: threading.Condition = threading.Condition()
-GAME_STARTED: bool = False
+GAME_RUNNING_CONDITION: threading.Condition = threading.Condition()
+GAME_RUNNING: bool = False
 WAIT_FOR_ANSWERS_CONDITION: threading.Condition = threading.Condition()
 ANSWERS_CHECKED_CONDITION: threading.Condition = threading.Condition()
 
 # init the class stats
 server_stats = stats.Statistic()
 
-
-
 class ClientHandler:
     def __init__(self, client_socket: socket.socket):
-        self.thread: threading.Thread = threading.Thread(target=self.handle)
         self.socket: socket.socket = client_socket
-
         self.name: str = None
-        self.answer: bool = None
-        self.correct: bool = None
-        self.in_game: bool = True
+        self.reset_state()
 
     def recieve_name(self):
         # get client name
         message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
         self.name = message.split(c.CLIENT_NAME_TERMINATION)[0]
+        print(f"{self.name} connected!")
+
+    def reset_state(self):
+        self.thread: threading.Thread = threading.Thread(target=self.handle)
+        self.answer: bool = None
+        self.answered: bool = False
+        self.correct: bool = None
+        self.in_game: bool = True
         
     def start(self):
+        self.reset_state()
         self.thread.start()
 
-    def exit_game(self):
+    def join(self):
+        self.thread.join()
+
+    def exit_round(self):
         self.in_game = False
+        self.send_message(c.GENERAL_MESSAGE, "You have been disqualified, idiot! Wait for the next round.")
 
     def disconnect(self):
         if self.in_game:
             # client disconnected
             print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
-            self.exit_game()
+            self.exit_round()
             return
+    
+    def send_message(self, message_type: str, message: str) -> None:
+        message = message_type + message + c.SERVER_MSG_TERMINATION
+        self.socket.sendall(message.encode())
 
     def handle(self):
         # wait for game to start
-        with GAME_STARTED_CONDITION:
-            while not GAME_STARTED:
-                GAME_STARTED_CONDITION.wait()
+        with GAME_RUNNING_CONDITION:
+            while not GAME_RUNNING:
+                GAME_RUNNING_CONDITION.wait()
 
             self.in_game = True
 
-        while GAME_STARTED:
+        while self.in_game and GAME_RUNNING:
             # get answer from client
             answer = None
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                 try:
-                    response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
+                    response_ready, _, _ = select.select([self.socket], [], [], c.SERVER_NO_ANSWER_TIMEOUT_SEC)
+                    if response_ready:
+                        response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
+                        print(f"Got response from {self.name}: {response}")
+                    else:
+                        # did not get response from client
+                        print(f"{self.name} did not answer in time.")
+                        response = None
+                        break
                 except Exception:
                     self.disconnect()
                     break
@@ -69,22 +90,28 @@ class ClientHandler:
                     break
                 answer = response.decode()
                 if answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
-                    error_message = c.ERROR_MESSAGE
-                    error_message += f"Invalid answer: {answer}"
-                    self.socket.sendall(error_message.encode())
+                    error_message = f"Invalid answer: {answer}"
+                    self.send_message(c.ERROR_MESSAGE, error_message)
 
             with WAIT_FOR_ANSWERS_CONDITION:
-                self.answer = True if answer in c.TRUE_ANSWERS else False
+                if answer in c.TRUE_ANSWERS:
+                    self.answer = True
+                elif answer in c.FALSE_ANSWERS:
+                    self.answer = False
+                else:
+                    self.answer = None
+                self.answered = True
                 WAIT_FOR_ANSWERS_CONDITION.notify()
 
             # wait for all answers to be checked
             with ANSWERS_CHECKED_CONDITION:
                 ANSWERS_CHECKED_CONDITION.wait()
 
-                if not self.correct:
+                if self.correct is False:
                     break
 
                 # reset answer and correct fields
+                self.answered = False
                 self.answer = None
                 self.correct = None
 
@@ -155,36 +182,37 @@ def handle_incoming_connections(server_socket: socket.socket) -> None:
 
 
 def send_welcome_message() -> None:
-    global SEND_BROADCAST
-
-    SEND_BROADCAST = False
-
-    welcome_message = c.WELCOME_MESSAGE
-    welcome_message += f'Welcome to {c.SERVER_NAME} trivia king!\n'
-    for i, client_handler in enumerate(CLIENTS_HANDLERS):
-        player_name = client_handler.name
-        welcome_message += f'Player {i + 1}: {player_name}\n'
+    # recieve names from all clients
+    for ch in CLIENTS_HANDLERS:
+        ch.recieve_name()
+        
+    welcome_message = f'Welcome to {c.SERVER_NAME} trivia king!\n'
+    for i, ch in enumerate(CLIENTS_HANDLERS):
+        welcome_message += f'Player {i + 1}: {ch.name}\n'
     welcome_message += '==\n'
 
-    # recieve names from all clients
-    for client_handler in CLIENTS_HANDLERS:
-        client_handler.recieve_name()
-        
     # send welcome message to every player
-    for client_handler in CLIENTS_HANDLERS:
-        client_handler.socket.sendall(welcome_message.encode())
+    for ch in CLIENTS_HANDLERS:
+        msg = f"Hello, comrad {ch.name}!\n"
+        msg += welcome_message
+        ch.send_message(c.WELCOME_MESSAGE, msg)
 
     time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
 
 
-def game_loop():
-    global GAME_STARTED
+def round_loop() -> ClientHandler:
+    global GAME_RUNNING
     for ch in CLIENTS_HANDLERS:
         ch.start()
     # start the game
-    GAME_STARTED = True
-    with GAME_STARTED_CONDITION:
-        GAME_STARTED_CONDITION.notify_all()
+    GAME_RUNNING = True
+    with GAME_RUNNING_CONDITION:
+        round_start_message = c.GENERAL_MESSAGE + "Round started! Get ready..."
+        for ch in CLIENTS_HANDLERS:
+            ch.send_message(c.GENERAL_MESSAGE, round_start_message)
+        GAME_RUNNING_CONDITION.notify_all()
+
+    print(f"{c.COLOR_YELLOW}Starting a new round...{c.COLOR_RESET}")
 
     in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
     selected_questions_indices = [-1]
@@ -198,8 +226,7 @@ def game_loop():
 
         # send the question to all players
         for client_handler in in_game_players:
-            client_handler.socket.sendall(
-                (c.QUESTION_MESSAGE + question).encode())
+            client_handler.send_message(c.QUESTION_MESSAGE, question)
 
         print(f"{c.COLOR_BLUE}Sent question: {question}. The answer is: {answer}{c.COLOR_RESET}")
 
@@ -208,58 +235,77 @@ def game_loop():
             pending_clients = len(in_game_players)
             while pending_clients > 0:
                 WAIT_FOR_ANSWERS_CONDITION.wait()
-                pending_clients = len(
-                    [ch for ch in in_game_players if ch.answer is None])
+                pending_clients = len([ch for ch in in_game_players if not ch.answered])
 
         # check answers
         with ANSWERS_CHECKED_CONDITION:
+            correct_players = []
+            incorrect_players = []
             for client_handler in in_game_players:
-                client_handler.correct = client_handler.answer == answer
-                if not client_handler.correct:
-                    print(f"{c.COLOR_RED}{client_handler.name} got the answer wrong.{c.COLOR_RESET}")
-                    client_handler.exit_game()
-                
-            # filter players
-            in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
+                if client_handler.answer == answer:
+                    correct_players.append(client_handler)
+                else:
+                    incorrect_players.append(client_handler)
             
-            if len(in_game_players) <= 1:
-                GAME_STARTED = False
+            print(f"{c.COLOR_CYAN}Correct players: {[ch.name for ch in correct_players]}{c.COLOR_RESET}")
+            print(f"{c.COLOR_RED}Incorrect players: {[ch.name for ch in incorrect_players]}{c.COLOR_RESET}")
+            
+            if len(correct_players) == 0:
+                print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
+                continue
+            else:
+                print(f"{c.COLOR_MAGENTA}Eliminating incorrect players...{c.COLOR_RESET}")
+
+                for client_handler in correct_players:
+                    client_handler.correct = True
+                for client_handler in incorrect_players:
+                    client_handler.correct = False
+                    client_handler.exit_round()
+                
+                # filter players
+                in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
+            
+            if len(in_game_players) == 1:
+                GAME_RUNNING = False
             ANSWERS_CHECKED_CONDITION.notify_all()
 
-
-    if len(in_game_players) == 0:
-        send_game_over_message(winner=None)
-    else:
-        winner_client_handler = in_game_players[0]
-        send_game_over_message(winner=winner_client_handler.name)
+    print("waiting for clients to finish...")
+    for ch in CLIENTS_HANDLERS:
+        ch.join()
+    
+    winner = in_game_players[0]
+    print("The round winner is: ", winner.name)
+    for ch in CLIENTS_HANDLERS:
+        ch.send_message(c.GENERAL_MESSAGE, f"The winner of this round is: {winner.name}")
+    return winner
+    
 
 
 def send_game_over_message(winner: str):
-    if winner is None:
-        print(f"{c.COLOR_GREEN}Game Over! (no winner){c.COLOR_RESET}")
-    else:
-        print(f"{c.COLOR_GREEN}Game Over! The winner is: {winner}{c.COLOR_RESET}")
+    print(f"{c.COLOR_GREEN}Game Over! The winner is: {winner}{c.COLOR_RESET}")
         
     for ch in CLIENTS_HANDLERS:
-        if winner is None:
-        # send all client message with the winner
-            ch.socket.sendall((c.GAME_OVER_MESSAGE + "No winner").encode())
+        msg = None
+        if ch.in_game:
+            msg = "You are the winner!"
+            # add the winner to the stats
+            server_stats.add_player_win(winner)
+
         else:
-            msg = None
-            if ch.in_game:
-                msg = c.GAME_OVER_MESSAGE + "You are the winner!"
-                # add the winner to the stats
-                server_stats.add_player_win(winner)
+            msg = f"The winner is: {winner}"
 
-            else:
-                msg = c.GAME_OVER_MESSAGE + f"The winner is: {winner}"
-
-            ch.socket.sendall(msg.encode())
+        ch.send_message(c.GAME_OVER_MESSAGE, msg)
         ch.disconnect()
+
+def is_game_decided(rounds_results: list[ClientHandler]) -> bool:
+    counts = Counter(rounds_results)
+    max_freq = max(counts.values())
+    return list(counts.values()).count(max_freq) == 1
 
 
 def listen(server_port: int = 0) -> None:
     global SEND_BROADCAST
+    global CLIENTS_HANDLERS
 
     ip_address = get_ip_address()
 
@@ -271,20 +317,40 @@ def listen(server_port: int = 0) -> None:
         server_port = server_socket.getsockname()[1]
         server_socket.listen()
 
-        broadcast_thread = threading.Thread(target=broadcast_loop,
-                                            args=(ip_address, c.SERVER_NAME, server_port))
-        SEND_BROADCAST = True
-        broadcast_thread.start()
+        
+        while True:
+            CLIENTS_HANDLERS = []
+            # broadcast invitation
+            broadcast_thread = threading.Thread(target=broadcast_loop,
+                                                args=(ip_address, c.SERVER_NAME, server_port))
+            SEND_BROADCAST = True
+            broadcast_thread.start()
 
-        # Start listening for incoming connections
-        # TODO: check that after the game is over, the server will run broadcast
-        print(f"Server started, listening on IP address {ip_address}")
-        handle_incoming_connections(server_socket=server_socket)
-        send_welcome_message()
-        game_loop()
+            # Start listening for incoming connections
+            print(f"Server started, listening on IP address {ip_address}")
+            handle_incoming_connections(server_socket=server_socket)
+            SEND_BROADCAST = False
+            broadcast_thread.join()
 
-        # implement print_player_wins in stats
-        server_stats.print_player_wins()
+            send_welcome_message()
+
+            rounds_results = []
+            for _ in range(c.MIN_ROUNDS):
+                round_winner = round_loop()
+                rounds_results.append(round_winner)
+            
+            # play more rounds until game is decided
+            while not is_game_decided(rounds_results):
+                # if there is more than one winner, the game is not decided. Go for another round (tiebreaker)
+                print(f"{c.COLOR_YELLOW}Game is not decided, tiebreaker round!{c.COLOR_RESET}")
+                round_winner = round_loop()
+                rounds_results.append(round_winner)
+
+            # find majority element in rounds_results
+            winner = max(set(rounds_results), key=rounds_results.count)
+
+            send_game_over_message(winner=winner.name)
+            server_stats.print_player_wins()
         
 
 if __name__ == '__main__':
