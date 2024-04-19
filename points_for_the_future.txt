@@ -33,5 +33,6 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 26. !!DONE!! If invalid answer inputed - is it not automatically terminating the player? I pressed nothing and the game stuck (Dani)
 27. Set bot difficulity modes (dumb as fuck - 0.3, data engineering student - 0.5, smartass - 0.7, software engineering student - 1.0) (Shahar)
 28. Transition between games when using bots is not working properly, server got an error. Test one human one bot game (Dani)
+29. I think we are wrong and 1 round is the loop until 1 player left standing (and the game is only one round) (Shahar let me know)
 
 
