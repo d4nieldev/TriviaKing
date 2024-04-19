@@ -11,7 +11,6 @@ import constants as c
 import statistic as stats
 
 
-GAME_RUNNING_CONDITION: threading.Condition = threading.Condition()
 GAME_RUNNING: bool = False
 SENT_QUESTION_CONDITION: threading.Condition = threading.Condition()
 SENT_QUESTION: bool = False
@@ -48,7 +47,7 @@ class ClientHandler:
     def join(self):
         self.thread.join()
 
-    def exit_round(self):
+    def disqualify(self):
         self.in_game = False
         self.send_message(c.GENERAL_MESSAGE, "You have been disqualified, idiot! Wait for the next round.")
 
@@ -56,7 +55,7 @@ class ClientHandler:
         if self.in_game:
             # client disconnected
             print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
-            self.exit_round()
+            self.in_game = False
             return
     
     def send_message(self, message_type: str, message: str) -> None:
@@ -64,12 +63,7 @@ class ClientHandler:
         self.socket.sendall(message.encode())
 
     def handle(self):
-        # wait for game to start
-        with GAME_RUNNING_CONDITION:
-            while not GAME_RUNNING:
-                GAME_RUNNING_CONDITION.wait()
-
-            self.in_game = True
+        self.in_game = True
 
         while self.in_game and GAME_RUNNING:
             # get answer from client
@@ -217,8 +211,6 @@ def send_welcome_message() -> None:
         msg += welcome_message
         ch.send_message(c.WELCOME_MESSAGE, msg)
 
-    time.sleep(c.SERVER_POST_WELCOME_PAUSE_SEC)
-
 
 def round_loop() -> ClientHandler:
     global GAME_RUNNING
@@ -228,15 +220,15 @@ def round_loop() -> ClientHandler:
     SENT_QUESTION = False
     ANSWERS_CHECKED = False
 
+    # start the game
+    round_start_message = c.GENERAL_MESSAGE + "Round started! Get ready..."
+    for ch in CLIENTS_HANDLERS:
+        ch.send_message(c.GENERAL_MESSAGE, round_start_message)
+
+    GAME_RUNNING = True
+
     for ch in CLIENTS_HANDLERS:
         ch.start()
-    # start the game
-    GAME_RUNNING = True
-    with GAME_RUNNING_CONDITION:
-        round_start_message = c.GENERAL_MESSAGE + "Round started! Get ready..."
-        for ch in CLIENTS_HANDLERS:
-            ch.send_message(c.GENERAL_MESSAGE, round_start_message)
-        GAME_RUNNING_CONDITION.notify_all()
 
     print(f"{c.COLOR_YELLOW}Starting a new round...{c.COLOR_RESET}")
 
@@ -273,41 +265,42 @@ def round_loop() -> ClientHandler:
         print("All answers received")
 
         # check answers
-        with ANSWERS_CHECKED_CONDITION:
-            correct_players: list[ClientHandler] = []
-            incorrect_players: list[ClientHandler] = []
-            for client_handler in in_game_players:
-                if client_handler.answer == answer:
-                    correct_players.append(client_handler)
-                else:
-                    incorrect_players.append(client_handler)
-            
-            print(f"{c.COLOR_CYAN}Correct players: {[ch.name for ch in correct_players]}{c.COLOR_RESET}")
-            print(f"{c.COLOR_RED}Incorrect players: {[ch.name for ch in incorrect_players]}{c.COLOR_RESET}")
-            
-            if len(correct_players) == 0:
-                print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
+        correct_players: list[ClientHandler] = []
+        incorrect_players: list[ClientHandler] = []
+        for client_handler in in_game_players:
+            if client_handler.answer == answer:
+                correct_players.append(client_handler)
             else:
-                print(f"{c.COLOR_MAGENTA}Eliminating incorrect players...{c.COLOR_RESET}")
+                incorrect_players.append(client_handler)
+        
+        print(f"{c.COLOR_CYAN}Correct players: {[ch.name for ch in correct_players]}{c.COLOR_RESET}")
+        print(f"{c.COLOR_RED}Incorrect players: {[ch.name for ch in incorrect_players]}{c.COLOR_RESET}")
+        
+        if len(correct_players) == 0:
+            print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
+        else:
+            print(f"{c.COLOR_MAGENTA}Eliminating incorrect players...{c.COLOR_RESET}")
 
-                for client_handler in correct_players:
-                    client_handler.correct = True
+            for client_handler in correct_players:
+                client_handler.correct = True
 
-                for client_handler in incorrect_players:
-                    client_handler.correct = False
-                    client_handler.exit_round()
-                
-                # filter players
-                in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
+            for client_handler in incorrect_players:
+                client_handler.correct = False
+                client_handler.disqualify()
             
-            if len(in_game_players) == 1:
-                GAME_RUNNING = False
+            # filter players
+            in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
+        
+        if len(in_game_players) == 1:
+            GAME_RUNNING = False
             
+        with ANSWERS_CHECKED_CONDITION:
             SENT_QUESTION = False
             ANSWERS_CHECKED = True
 
             ANSWERS_CHECKED_CONDITION.notify_all()
-            print("Answers checked")
+
+        print("Answers checked")
 
     print("waiting for clients to finish...")
     for ch in CLIENTS_HANDLERS:

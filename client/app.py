@@ -59,7 +59,6 @@ class Client:
             print(f"{self.team_name} Answer: {ans}")
         else:
             ans = self.wait_for_input()
-            print(f"Answer: {ans}")
         return ans
 
     def transition_state(self, new_state):
@@ -134,32 +133,24 @@ class Client:
                 break
             except OSError:
                 break
-
-    # def wait_for_input(self):
-    #     self.received_new_message.clear()
-    #     while not self.received_new_message.is_set():
-    #         # Use select to check if there is input available without blocking
-    #         input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
-    #         if input_ready:
-    #             # Read user input
-    #             return sys.stdin.readline().rstrip()
-    #     return None
     
     def wait_for_input(self):
         self.received_new_message.clear()
+        print("Answer: ", end="")
+        ans = None
         while not self.received_new_message.is_set():
             try:
                 # Use select to check if there is input available without blocking
                 input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
                 if input_ready:
                     # Read user input
-                    return sys.stdin.readline().rstrip()
+                    ans = sys.stdin.readline().rstrip()
             except OSError:
                 # Handle the case for Windows when select is used with stdin
                 if msvcrt.kbhit():
-                    return sys.stdin.readline().rstrip()
-
-        return None
+                    ans = sys.stdin.readline().rstrip()
+        print(ans)
+        return ans
 
     def game_mode(self):
         last_question = None
