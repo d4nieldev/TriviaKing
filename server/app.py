@@ -13,8 +13,11 @@ import statistic as stats
 
 GAME_RUNNING_CONDITION: threading.Condition = threading.Condition()
 GAME_RUNNING: bool = False
+SENT_QUESTION_CONDITION: threading.Condition = threading.Condition()
+SENT_QUESTION: bool = False
 WAIT_FOR_ANSWERS_CONDITION: threading.Condition = threading.Condition()
 ANSWERS_CHECKED_CONDITION: threading.Condition = threading.Condition()
+ANSWERS_CHECKED: bool = False
 
 # init the class stats
 server_stats = stats.Statistic()
@@ -71,6 +74,10 @@ class ClientHandler:
         while self.in_game and GAME_RUNNING:
             # get answer from client
             answer = None
+            with SENT_QUESTION_CONDITION:
+                if not SENT_QUESTION:
+                    SENT_QUESTION_CONDITION.wait()
+
             while answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                 try:
                     response_ready, _, _ = select.select([self.socket], [], [], c.SERVER_NO_ANSWER_TIMEOUT_SEC)
@@ -84,15 +91,17 @@ class ClientHandler:
                         break
                 except Exception:
                     self.disconnect()
-                    break
+                    return  # kill the thread
                 if response == 0:
                     self.disconnect()
-                    break
+                    return  # kill the thread
+                
                 answer = response.decode()
                 if answer not in c.TRUE_ANSWERS + c.FALSE_ANSWERS:
                     error_message = f"Invalid answer: {answer}"
                     self.send_message(c.ERROR_MESSAGE, error_message)
 
+            # nofify the main thread that another player answered
             with WAIT_FOR_ANSWERS_CONDITION:
                 if answer in c.TRUE_ANSWERS:
                     self.answer = True
@@ -102,10 +111,16 @@ class ClientHandler:
                     self.answer = None
                 self.answered = True
                 WAIT_FOR_ANSWERS_CONDITION.notify()
+            
+            print(f'{self.name} answered: {self.answer}')
 
             # wait for all answers to be checked
             with ANSWERS_CHECKED_CONDITION:
-                ANSWERS_CHECKED_CONDITION.wait()
+                if not ANSWERS_CHECKED:
+                    print(f'{self.name} waiting for answers to be checked...')
+                    ANSWERS_CHECKED_CONDITION.wait()
+
+                print(f'{self.name} correct: {self.correct}')
 
                 if self.correct is False:
                     break
@@ -159,7 +174,11 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         # Comment for MAC (shit), Uncomment for Windows (best)
-        sock.bind((ip_address, c.BROADCAST_PORT))
+        try:
+            sock.bind((ip_address, c.BROADCAST_PORT))
+        except OSError:
+            # on mac
+            pass
         while SEND_BROADCAST:
             sock.sendto(udp_packet, broadcast_address)
             time.sleep(c.SERVER_BROADCAST_PERIOD_SEC)
@@ -203,6 +222,12 @@ def send_welcome_message() -> None:
 
 def round_loop() -> ClientHandler:
     global GAME_RUNNING
+    global SENT_QUESTION
+    global ANSWERS_CHECKED
+
+    SENT_QUESTION = False
+    ANSWERS_CHECKED = False
+
     for ch in CLIENTS_HANDLERS:
         ch.start()
     # start the game
@@ -218,30 +243,39 @@ def round_loop() -> ClientHandler:
     in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
     selected_questions_indices = [-1]
     while len(in_game_players) > 1:
+        print(f'in game players: {[ch.name for ch in in_game_players]}')
         # choose a random question
         question_index = -1
         while question_index in selected_questions_indices:
             question_index = random.randint(0, len(QUESTIONS) - 1)
         selected_questions_indices.append(question_index)
         question, answer = QUESTIONS[question_index]
-
+        
         # send the question to all players
         for client_handler in in_game_players:
             client_handler.send_message(c.QUESTION_MESSAGE, question)
+
+        with SENT_QUESTION_CONDITION:
+            SENT_QUESTION = True
+            ANSWERS_CHECKED = False
+            SENT_QUESTION_CONDITION.notify_all()
 
         print(f"{c.COLOR_BLUE}Sent question: {question}. The answer is: {answer}{c.COLOR_RESET}")
 
         # wait for answers
         with WAIT_FOR_ANSWERS_CONDITION:
-            pending_clients = len(in_game_players)
-            while pending_clients > 0:
+            pending_clients = in_game_players
+            while len(pending_clients) > 0:
+                print("pending clients: ", [ch.name for ch in pending_clients])
                 WAIT_FOR_ANSWERS_CONDITION.wait()
-                pending_clients = len([ch for ch in in_game_players if not ch.answered])
+                pending_clients = [ch for ch in in_game_players if not ch.answered]
+        
+        print("All answers received")
 
         # check answers
         with ANSWERS_CHECKED_CONDITION:
-            correct_players = []
-            incorrect_players = []
+            correct_players: list[ClientHandler] = []
+            incorrect_players: list[ClientHandler] = []
             for client_handler in in_game_players:
                 if client_handler.answer == answer:
                     correct_players.append(client_handler)
@@ -253,12 +287,12 @@ def round_loop() -> ClientHandler:
             
             if len(correct_players) == 0:
                 print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
-                continue
             else:
                 print(f"{c.COLOR_MAGENTA}Eliminating incorrect players...{c.COLOR_RESET}")
 
                 for client_handler in correct_players:
                     client_handler.correct = True
+
                 for client_handler in incorrect_players:
                     client_handler.correct = False
                     client_handler.exit_round()
@@ -268,7 +302,12 @@ def round_loop() -> ClientHandler:
             
             if len(in_game_players) == 1:
                 GAME_RUNNING = False
+            
+            SENT_QUESTION = False
+            ANSWERS_CHECKED = True
+
             ANSWERS_CHECKED_CONDITION.notify_all()
+            print("Answers checked")
 
     print("waiting for clients to finish...")
     for ch in CLIENTS_HANDLERS:

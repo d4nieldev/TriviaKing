@@ -5,7 +5,11 @@ import struct
 import threading
 import select
 import sys
-import msvcrt
+try:
+    import msvcrt
+except ImportError:
+    # on mac
+    pass
 
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
@@ -200,7 +204,7 @@ class Client:
     def disconnect(self):
         if self.tcp_socket:
             self.tcp_socket.close()
-            print(f"{c.COLOR_RED} {self.team_name} disconnected from server.{c.COLOR_RESET}")
+            print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
             self.tcp_socket = None
     
     def reconnect(self):
