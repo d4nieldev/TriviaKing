@@ -136,8 +136,8 @@ class Client:
     
     def wait_for_input(self):
         self.received_new_message.clear()
-        print("Answer: ", end="")
         ans = None
+        print("Answer: ", end='', flush=True)
         while not self.received_new_message.is_set():
             try:
                 # Use select to check if there is input available without blocking
@@ -145,11 +145,12 @@ class Client:
                 if input_ready:
                     # Read user input
                     ans = sys.stdin.readline().rstrip()
+                    break
             except OSError:
                 # Handle the case for Windows when select is used with stdin
                 if msvcrt.kbhit():
                     ans = sys.stdin.readline().rstrip()
-        print(ans)
+                    break
         return ans
 
     def game_mode(self):
