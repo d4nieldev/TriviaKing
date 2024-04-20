@@ -49,7 +49,6 @@ class Statistic:
         return max(self.player_wins, key=self.player_wins.get)
     
     def print_player_wins(self):
-        print("Server all time winners:")
         sorted_players = sorted(self.player_wins.items(), key=lambda x: x[1], reverse=True)
         # Ensure there are three players (fill with "Empty" if fewer than three)
         while len(sorted_players) < 3:

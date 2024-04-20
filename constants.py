@@ -79,7 +79,7 @@ COLOR_CYAN = "\033[96m"
 # STATS 
 FILE_PATH_WINS = 'NovaBeach_Champs.json'
 PODIUM_STR = '''
-Server All-Time Winners Podium:
+NovaBeach Server All-Time Winners Podium:
 
                                 {}👑
                               ______________________________
@@ -90,8 +90,8 @@ ______________________________
                                                               ______________________________
                                                                                                 
 
-
 May the odds be ever in your favor!
+
 
 
 Full players rank:
