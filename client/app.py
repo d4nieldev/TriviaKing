@@ -143,9 +143,18 @@ class Client:
                 break
             except OSError:
                 break
+
+    def clear_input(self):
+        try:
+            while msvcrt.kbhit():
+                msvcrt.getch()
+        except ImportError:
+            import sys, termios    #for linux/unix
+            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
     
     def wait_for_input(self):
         self.received_new_message.clear()
+        self.clear_input()
         ans = None
         print("Answer: ", end='', flush=True)
         while not self.received_new_message.is_set():
