@@ -52,12 +52,10 @@ class ClientHandler:
         self.send_message(c.GENERAL_MESSAGE, "You have been disqualified, idiot! Wait for the next round.")
 
     def disconnect(self):
-        if self.in_game:
-            # client disconnected
-            self.socket.close()
-            print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
-            CLIENTS_HANDLERS.remove(self)
-            self.in_game = False
+        self.socket.close()
+        print(f"{c.COLOR_RED}{self.name} disconnected.{c.COLOR_RESET}")
+        CLIENTS_HANDLERS.remove(self)
+        self.in_game = False
     
     def send_message(self, message_type: str, message: str) -> None:
         message = message_type + message + c.SERVER_MSG_TERMINATION
@@ -210,7 +208,7 @@ def send_welcome_message() -> None:
         ch.send_message(c.WELCOME_MESSAGE, msg)
 
 
-def round_loop(round_num: int) -> ClientHandler:
+def game_loop() -> ClientHandler:
     global GAME_RUNNING
     global SENT_QUESTION
     global ANSWERS_CHECKED
@@ -218,14 +216,10 @@ def round_loop(round_num: int) -> ClientHandler:
     SENT_QUESTION = False
     ANSWERS_CHECKED = False
 
-    # start the round
-    round_start_message = f"Round {round_num} is starting in {c.ROUND_PAUSE_SEC} seconds. Get ready..."
-    for ch in CLIENTS_HANDLERS:
-        ch.send_message(c.GENERAL_MESSAGE, round_start_message)
-    print(f"{c.COLOR_YELLOW}{round_start_message}{c.COLOR_RESET}")
-    
-    # optinal - sleep to give players time to prepare
-    time.sleep(c.ROUND_PAUSE_SEC)
+    round_num = 1
+
+    def get_round_start_message() -> str:
+        return f"Round {round_num} is starting in {c.ROUND_PAUSE_SEC} seconds. Get ready..."
 
     GAME_RUNNING = True
 
@@ -235,11 +229,21 @@ def round_loop(round_num: int) -> ClientHandler:
     in_game_players = [ch for ch in CLIENTS_HANDLERS if ch.in_game]
     selected_questions_indices = [-1]
     while len(in_game_players) > 1:
+        # start the round
+        round_start_message = get_round_start_message()
+        for ch in CLIENTS_HANDLERS:
+            ch.send_message(c.GENERAL_MESSAGE, round_start_message)
+        print(f"{c.COLOR_YELLOW}{round_start_message}{c.COLOR_RESET}")
+        
+
         in_game_players_str = ', '.join([p.name for p in in_game_players])
         before_question_message = f"Players still in the game: {in_game_players_str}"
         for ch in CLIENTS_HANDLERS:
             ch.send_message(c.GENERAL_MESSAGE, before_question_message)
         print(f"{c.COLOR_YELLOW}{before_question_message}{c.COLOR_RESET}")
+
+        # optinal - sleep to give players time to prepare
+        time.sleep(c.ROUND_PAUSE_SEC)
 
         # choose a random question
         question_index = -1
@@ -309,33 +313,20 @@ def round_loop(round_num: int) -> ClientHandler:
     print("waiting for clients to exit normally...")
     for ch in CLIENTS_HANDLERS:
         ch.join()
-    
-    winner = in_game_players[0]
-    print(f"{c.COLOR_GREEN}The round winner is: {winner.name}{c.COLOR_RESET}")
-    for ch in CLIENTS_HANDLERS:
-        if ch == winner:
-            round_over_message = f"{c.COLOR_GREEN}You are the winner of this round!{c.COLOR_RESET}"
-        else:
-            round_over_message = f"The winner of this round is: {winner.name}"
-        ch.send_message(c.GENERAL_MESSAGE, round_over_message)
 
-    return winner
+    return in_game_players[0]
     
-
 
 def send_game_over_message(winner: str):
-    print(f"{c.COLOR_MAGENTA}Game Over! The winner is: {winner}{c.COLOR_RESET}")
-        
-    for ch in CLIENTS_HANDLERS:
+    clients_handlers = list(CLIENTS_HANDLERS)
+    for ch in clients_handlers:
         msg = None
         if ch.in_game:
             msg = f"{c.COLOR_GREEN}You are the winner!{c.COLOR_RESET}"
             # add the winner to the stats
             server_stats.add_player_win(winner)
-
         else:
             msg = f"The winner is: {winner}"
-
         ch.send_message(c.GAME_OVER_MESSAGE, msg)
         ch.disconnect()
 
@@ -343,15 +334,6 @@ def is_game_decided(rounds_results: list[ClientHandler]) -> bool:
     counts = Counter(rounds_results)
     max_freq = max(counts.values())
     return list(counts.values()).count(max_freq) == 1
-
-def show_current_game_leaderboard(rounds_results: list[ClientHandler]) -> None:
-    counts = Counter(rounds_results)
-    leaderboard_message = "Current game leaderboard:\n"
-    for ch in CLIENTS_HANDLERS:
-        leaderboard_message += f"{ch.name}: {counts[ch]}\n"
-    print(leaderboard_message)
-    for ch in CLIENTS_HANDLERS:
-        ch.send_message(c.GENERAL_MESSAGE, leaderboard_message)
 
 
 def listen(server_port: int = 0) -> None:
@@ -384,26 +366,7 @@ def listen(server_port: int = 0) -> None:
             broadcast_thread.join()
 
             send_welcome_message()
-
-            rounds_results = []
-            round_num = 0
-            for round_idx in range(c.MIN_ROUNDS):
-                round_num += 1
-                round_winner = round_loop(round_num=round_num)
-                rounds_results.append(round_winner)
-                show_current_game_leaderboard(rounds_results)
-            
-            # play more rounds until game is decided
-            while not is_game_decided(rounds_results):
-                # if there is more than one winner, the game is not decided. Go for another round (tiebreaker)
-                print(f"{c.COLOR_YELLOW}Game is not decided, tiebreaker round!{c.COLOR_RESET}")
-                round_winner = round_loop(round_num=round_num)
-                rounds_results.append(round_winner)
-                show_current_game_leaderboard(rounds_results)
-
-            # find majority element in rounds_results
-            winner = max(set(rounds_results), key=rounds_results.count)
-
+            winner = game_loop()
             send_game_over_message(winner=winner.name)
             server_stats.print_player_wins()
         

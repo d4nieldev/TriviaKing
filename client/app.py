@@ -62,10 +62,12 @@ class Client:
                 ans = not correct_ans
             # Map Boolean answer to string
             ans = c.TRUE_ANSWERS[1] if ans else c.FALSE_ANSWERS[1]
-
+            print(f"Answer: {ans}")
         else:
             ans = self.wait_for_input()
-        return ans
+        if ans is not None and len(ans) > 1:
+            print(f"{c.COLOR_RED}Answer exeeded answer length, sending '{ans[0]}'{c.COLOR_RESET}")
+        return ans[0] if ans else None
 
     def transition_state(self, new_state):
         self.state = new_state
@@ -132,7 +134,9 @@ class Client:
                     self.disconnect()
                 self.received_new_message.set()
                 with self.server_messages_pending_condition:
-                    self.server_messages += data.decode().split(c.SERVER_MSG_TERMINATION)
+                    new_server_messages = data.decode().split(c.SERVER_MSG_TERMINATION)
+                    new_server_messages = [msg for msg in new_server_messages if len(msg) > 0]
+                    self.server_messages += new_server_messages
                     self.server_messages_pending_condition.notify()
             except ConnectionAbortedError:
                 self.reconnect()
