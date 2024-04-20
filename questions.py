@@ -150,3 +150,7 @@ QUESTIONS = [
     ("Octopuses have three hearts.", True),
     ("The shortest war in history lasted only 38 minutes.", True)
 ]
+
+
+# Convert list of tuples to a dictionary
+QUESTIONS_DICT = {question: is_true for question, is_true in QUESTIONS}

@@ -115,8 +115,6 @@ class ClientHandler:
                 if not ANSWERS_CHECKED:
                     ANSWERS_CHECKED_CONDITION.wait()
 
-            print(f'{self.name} correct: {self.correct}')
-
             if self.correct is False:
                 break
 
@@ -278,11 +276,11 @@ def round_loop(round_num: int) -> ClientHandler:
             else:
                 incorrect_players.append(client_handler)
         
-        print(f"{c.COLOR_CYAN}Correct players: {[ch.name for ch in correct_players]}{c.COLOR_RESET}")
-        print(f"{c.COLOR_RED}Incorrect players: {[ch.name for ch in incorrect_players]}{c.COLOR_RESET}")
+        print(f"{c.COLOR_GREEN}Correct players: {', '.join([ch.name for ch in correct_players])}{c.COLOR_RESET}")
+        print(f"{c.COLOR_RED}Incorrect players: {', '.join([ch.name for ch in incorrect_players])}{c.COLOR_RESET}")
         
         if len(correct_players) == 0:
-            print(f"{c.COLOR_MAGENTA}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
+            print(f"{c.COLOR_YELLOW}No one got the answer right. Trying again with a new question.{c.COLOR_RESET}")
         else:
             for client_handler in correct_players:
                 client_handler.correct = True
@@ -296,9 +294,7 @@ def round_loop(round_num: int) -> ClientHandler:
         
         # let players know who is still in the game:
         for ch in in_game_players:
-            other_in_game_players = [p for p in in_game_players if p != ch]
-            other_in_game_players_str = ', '.join([p.name for p in other_in_game_players])
-            msg = f"You are correct! Players still in the game: {[other_in_game_players_str]}"
+            msg = f"{c.COLOR_GREEN}You are correct!{c.COLOR_RESET}"
             ch.send_message(c.GENERAL_MESSAGE, msg)
         
         if len(in_game_players) == 1:
@@ -318,7 +314,7 @@ def round_loop(round_num: int) -> ClientHandler:
     print(f"{c.COLOR_GREEN}The round winner is: {winner.name}{c.COLOR_RESET}")
     for ch in CLIENTS_HANDLERS:
         if ch == winner:
-            round_over_message = f"You are the winner of this round!"
+            round_over_message = f"{c.COLOR_GREEN}You are the winner of this round!{c.COLOR_RESET}"
         else:
             round_over_message = f"The winner of this round is: {winner.name}"
         ch.send_message(c.GENERAL_MESSAGE, round_over_message)
@@ -328,12 +324,12 @@ def round_loop(round_num: int) -> ClientHandler:
 
 
 def send_game_over_message(winner: str):
-    print(f"{c.COLOR_GREEN}Game Over! The winner is: {winner}{c.COLOR_RESET}")
+    print(f"{c.COLOR_MAGENTA}Game Over! The winner is: {winner}{c.COLOR_RESET}")
         
     for ch in CLIENTS_HANDLERS:
         msg = None
         if ch.in_game:
-            msg = "You are the winner!"
+            msg = f"{c.COLOR_GREEN}You are the winner!{c.COLOR_RESET}"
             # add the winner to the stats
             server_stats.add_player_win(winner)
 

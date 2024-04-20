@@ -1,4 +1,5 @@
 import constants as c
+from questions import QUESTIONS_DICT
 import socket
 import random
 import struct
@@ -15,7 +16,7 @@ BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
 
 class Client:
-    def __init__(self, bot=False):
+    def __init__(self, bot=False, bot_level = None):
         self.server_port = None
         self.BUFFER_SIZE = 1024  # Assuming a buffer size value
         self.team_name = self.generate_bot_name() if bot else self.generate_team_name()
@@ -24,15 +25,13 @@ class Client:
         self.server_ip = None
         self.server_name = None
         self.bot = bot
+        self.bot_level = bot_level
         self.server_messages = []
         self.server_messages_pending_condition = threading.Condition()
         self.received_new_message = threading.Event()
-
-        # States: looking_for_server, connecting_to_server, game_mode
-        self.state = c.CLIENT_STATE_LOOKING_FOR_SERVER
-        
-        # Input recieved by manual player
-        self.answer = None
+        self.state = c.CLIENT_STATE_LOOKING_FOR_SERVER  # States: looking_for_server, connecting_to_server, game_mode
+        self.answer = None # Input recieved by manual player
+        self.curr_question = None  # Current question in game
 
     @classmethod
     def generate_bot_name(cls):
@@ -54,9 +53,16 @@ class Client:
 
     def answer_the_bloody_question(self):        
         if self.bot:
-            # Random answer can be replaced with any chatbot API, but we are poor
-            ans = random.choice(c.TRUE_ANSWERS + c.FALSE_ANSWERS)
-            print(f"{self.team_name} Answer: {ans}")
+            # Get the correct answer for the current question from the dictionary
+            correct_ans = QUESTIONS_DICT.get(self.curr_question, None)
+            # Decide whether to answer correctly based on the bot's level
+            if random.random() < self.bot_level:
+                ans = correct_ans
+            else:
+                ans = not correct_ans
+            # Map Boolean answer to string
+            ans = c.TRUE_ANSWERS[1] if ans else c.FALSE_ANSWERS[1]
+
         else:
             ans = self.wait_for_input()
         return ans
@@ -154,7 +160,7 @@ class Client:
         return ans
 
     def game_mode(self):
-        last_question = None
+        self.curr_question = None
         was_error = False
 
         server_listener_thread = threading.Thread(target=self.listen_to_server)
@@ -166,7 +172,7 @@ class Client:
                         self.server_messages_pending_condition.wait()
                     data = self.server_messages.pop(0)
             else:
-                data = last_question
+                data = self.curr_question
                 was_error = False
 
             server_message = data
@@ -176,10 +182,10 @@ class Client:
             elif server_message.startswith(c.ERROR_MESSAGE):
                 server_message = server_message.replace(c.ERROR_MESSAGE, "")
                 print(f"{c.COLOR_RED}Error: {server_message}{c.COLOR_RESET}")
-                server_message = last_question
+                server_message = self.curr_question
                 was_error = True
             elif server_message.startswith(c.QUESTION_MESSAGE):
-                last_question = server_message
+                self.curr_question = server_message
                 server_message = server_message.replace(c.QUESTION_MESSAGE, "")
                 print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
                 ans = self.answer_the_bloody_question()
@@ -213,13 +219,13 @@ class Client:
                 self.game_mode()
 
 
-def create_player(bot=False):
+def create_player(bot=False, bot_level_str='c'):
     '''
     External method to create players, both human and bots, 
     in order to activate as a thread worker if necessary.
     '''
     if bot:
-        client = Client(bot=True)
+        client = Client(bot=True, bot_level=c.BOT_LEVELS.get(bot_level_str, None))
         client.run()
     else:
         client = Client(bot=False)
@@ -233,13 +239,25 @@ if __name__ == '__main__':
         client_type = input(
             """\nHello comrad!\nPress P if you want to sign in as a player.\nPress B if you want bot players to join the game:\n""").lower().strip()
         if client_type == "b":
-            # Random number of bots will join the game
-            num_bots = random.randint(c.MIN_NUM_BOTS, c.MAX_NUM_BOTS)
-            # num_bots = 2  # Constant number of bots
+            while True:
+                try:
+                    num_bots = int(input("""How many bots would you like to add to the game?\n""").lower().strip())
+                    if num_bots == 0:
+                        raise Exception
+                    break
+                except Exception:
+                    print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
+                    continue
+            while True:
+                bot_level_str = input("""\nHow smart would you like the bot to be?\nPress 'A' for Sheldon Cooper smart\nPress 'B' for Brainy Smurf smart\nPress 'C' for average US public school smart\nPress 'D' for Dumb as Fu*k\n""").lower().strip()
+                if bot_level_str not in ['a','b','c','d']:
+                    print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
+                    continue
+                break
             threads = []
             for i in range(num_bots):
                 thread = threading.Thread(
-                    target=create_player, args=[True])
+                    target=create_player, args=[True, bot_level_str])
                 threads.append(thread)
                 thread.start()
 

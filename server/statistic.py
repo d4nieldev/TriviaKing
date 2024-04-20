@@ -50,8 +50,16 @@ class Statistic:
     
     def print_player_wins(self):
         print("Server all time winners:")
-        for player in sorted(self.player_wins, key=self.player_wins.get, reverse=True):
-            print(f"{player}: {self.player_wins[player]}")
+        sorted_players = sorted(self.player_wins.items(), key=lambda x: x[1], reverse=True)
+        # Ensure there are three players (fill with "Empty" if fewer than three)
+        while len(sorted_players) < 3:
+            sorted_players.append(("Place Holder", 0))
+            
+        top_3 = [f"{player}" for player, wins in sorted_players[:3]]
+        
+        full_res = '\n'.join([f"{player}: {wins}" for player, wins in sorted_players])
+        print(c.PODIUM_STR.format(top_3[0], top_3[1], top_3[2], full_res))
+
 
     def update_file(self):
         with open(c.FILE_PATH_WINS, 'w') as file:
