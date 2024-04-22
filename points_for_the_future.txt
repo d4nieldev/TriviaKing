@@ -29,7 +29,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 22. !!DONE!! Replace all key and strings and const num in Client with constants (Shahar)
 23. Replace all key and strings and const num in Server with constants (Guy + Dani)
 24. "Network code is isolated to a single network" - What? Ask around (Shahar)
-25. You cannot add more then len(c.CLIENT_TEAM_NAMES) manual players to the game. Maybe that should be stated somewhere (Dani)
+25. !!NEVER MIND!! You cannot add more then len(c.CLIENT_TEAM_NAMES) manual players to the game. Maybe that should be stated somewhere
 26. !!DONE!! If invalid answer inputed - is it not automatically terminating the player? I pressed nothing and the game stuck (Dani)
 27. !!DONE!! Set bot difficulity modes (dumb as fuck - 0.3, data engineering student - 0.5, smartass - 0.7, software engineering student - 1.0) (Shahar)
 28. !!DONE!! Transition between games when using bots is not working properly, server got an error. Test one human one bot game (Dani)
