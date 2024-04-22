@@ -148,7 +148,7 @@ class Client:
         try:
             while msvcrt.kbhit():
                 msvcrt.getch()
-        except ImportError:
+        except NameError:
             import sys, termios    #for linux/unix
             termios.tcflush(sys.stdin, termios.TCIOFLUSH)
     
