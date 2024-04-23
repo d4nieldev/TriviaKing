@@ -24,6 +24,7 @@ class Client:
         self.tcp_socket = None
         self.server_ip = None
         self.server_name = None
+        self.connected = False
         self.bot = bot
         self.bot_level = bot_level
         self.server_messages = []
@@ -120,6 +121,7 @@ class Client:
         try:
             self.tcp_socket.connect((self.server_ip, self.server_port))
             self.tcp_socket.send((self.team_name + '\n').encode())
+            self.connected = True
             print(f"{self.team_name} connected to the server and sent player name.")
             self.transition_state(c.CLIENT_STATE_GAME_MODE)
         except Exception as e:
@@ -131,7 +133,7 @@ class Client:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
                 if data == 0:
-                    self.disconnect()
+                    self.reconnect()
                 self.received_new_message.set()
                 with self.server_messages_pending_condition:
                     new_server_messages = data.decode().split(c.SERVER_MSG_TERMINATION)
@@ -183,7 +185,10 @@ class Client:
                 with self.server_messages_pending_condition:
                     if len(self.server_messages) == 0:
                         self.server_messages_pending_condition.wait()
-                    data = self.server_messages.pop(0)
+                    if not len(self.server_messages) == 0:    
+                        data = self.server_messages.pop(0)
+                    else:
+                       self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER) 
             else:
                 data = self.curr_question
                 was_error = False
@@ -217,13 +222,15 @@ class Client:
             self.tcp_socket.close()
             print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
             self.tcp_socket = None
+            self.connected = False
     
     def reconnect(self):
         self.disconnect()
+        _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish to reconnect to the game server{c.COLOR_RESET}")
         self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
 
     def run(self):
-        while True:
+        while True:            
             if self.state == c.CLIENT_STATE_LOOKING_FOR_SERVER:
                 self.find_server()
             elif self.state == c.CLIENT_STATE_CONNECTING_TO_SERVER:
