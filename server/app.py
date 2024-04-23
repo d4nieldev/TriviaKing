@@ -45,6 +45,7 @@ class ClientHandler:
         self.thread.start()
 
     def join(self):
+        self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
         self.thread.join()
 
     def disqualify(self):
@@ -95,8 +96,7 @@ class ClientHandler:
                     print(f"Error while recieving answer from client {self.name}")
                     self.disconnect()
                     return  # kill the thread
-                if response == 0:
-                    print(f"{self.name} disconnected.")
+                if not response:
                     self.disconnect()
                     return  # kill the thread
                 
@@ -348,11 +348,6 @@ def send_game_over_message(winner: str):
             msg = f"The winner is: {winner}"
         ch.send_message(c.GAME_OVER_MESSAGE, msg)
         ch.disconnect()
-
-def is_game_decided(rounds_results: list[ClientHandler]) -> bool:
-    counts = Counter(rounds_results)
-    max_freq = max(counts.values())
-    return list(counts.values()).count(max_freq) == 1
 
 
 def listen(server_port: int = 0) -> None:

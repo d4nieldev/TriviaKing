@@ -132,7 +132,7 @@ class Client:
         while True:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
-                if data == 0:
+                if not data:
                     self.reconnect()
                 self.received_new_message.set()
                 with self.server_messages_pending_condition:
@@ -188,6 +188,7 @@ class Client:
                     if not len(self.server_messages) == 0:    
                         data = self.server_messages.pop(0)
                     else:
+                       print(f'{c.COLOR_RED}server disconnected{c.COLOR_RESET}')
                        self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER) 
             else:
                 data = self.curr_question
@@ -263,7 +264,7 @@ if __name__ == '__main__':
                 try:
                     num_bots = int(input("""How many bots would you like to add to the game?\n""").lower().strip())
                     if num_bots == 0:
-                        raise Exception
+                        raise Exception("Number of bost needs to be greater than 0.")
                     break
                 except Exception:
                     print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
