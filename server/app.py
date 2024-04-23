@@ -45,7 +45,6 @@ class ClientHandler:
         self.thread.start()
 
     def join(self):
-        self.socket.close()
         self.thread.join()
 
     def disqualify(self):
@@ -320,10 +319,10 @@ def game_loop() -> ClientHandler:
         if len(get_in_game_players()) == 1:
             GAME_RUNNING = False
             
-        with ANSWERS_CHECKED_CONDITION:
-            SENT_QUESTION = False
-            ANSWERS_CHECKED = True
+        SENT_QUESTION = False
+        ANSWERS_CHECKED = True
 
+        with ANSWERS_CHECKED_CONDITION:
             ANSWERS_CHECKED_CONDITION.notify_all()
 
         round_num += 1
