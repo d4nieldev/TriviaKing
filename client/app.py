@@ -133,6 +133,7 @@ class Client:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
                 if not data:
+                    print(f'{c.COLOR_RED}server disconnected. reconnecting...{c.COLOR_RESET}')
                     self.reconnect()
                 self.received_new_message.set()
                 with self.server_messages_pending_condition:
@@ -188,7 +189,6 @@ class Client:
                     if not len(self.server_messages) == 0:    
                         data = self.server_messages.pop(0)
                     else:
-                       print(f'{c.COLOR_RED}server disconnected{c.COLOR_RESET}')
                        self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER) 
             else:
                 data = self.curr_question
