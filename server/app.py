@@ -83,6 +83,7 @@ class ClientHandler:
                     print(f'waiting for answer from {self.name}')
                     response_ready, _, _ = select.select([self.socket], [], [], c.SERVER_NO_ANSWER_TIMEOUT_SEC)
                     if response_ready:
+                        print(f'Waiting for {self.name} input')
                         response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
                         print(f"Got response from {self.name}: {response}")
                     else:

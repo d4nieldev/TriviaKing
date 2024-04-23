@@ -34,5 +34,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 27. !!DONE!! Set bot difficulity modes (dumb as fuck - 0.3, data engineering student - 0.5, smartass - 0.7, software engineering student - 1.0) (Shahar)
 28. !!DONE!! Transition between games when using bots is not working properly, server got an error. Test one human one bot game (Dani)
 29. !!DONE!! I think we are wrong and 1 round is the loop until 1 player left standing (and the game is only one round) (Shahar let me know)
+30. Need to create try-catch for client - in case of server error (Shahar)
+31. Add input to client before a new Game (Shahar)
 
 
