@@ -141,7 +141,7 @@ class Client:
                     new_server_messages = [msg for msg in new_server_messages if len(msg) > 0]
                     self.server_messages += new_server_messages
                     self.server_messages_pending_condition.notify()
-            except ConnectionAbortedError:
+            except (ConnectionAbortedError, AttributeError):
                 self.reconnect()
                 break
             except OSError:
