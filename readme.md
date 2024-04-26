@@ -13,8 +13,10 @@
 3. Run server:
 
     - `cd server`
+    - Add PYTHONPATH environment variable (Step 2, depends on terminal)
     - `python app.py`
 
 4. Run client:
     - `cd client`
+    - Add PYTHONPATH environment variable (Step 2, depends on terminal)
     - `python app.py`

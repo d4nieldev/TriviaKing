@@ -297,7 +297,7 @@ def handle_new_connection(client_socket: socket.socket, client_address: tuple) -
     print(f"{c.COLOR_YELLOW}New connection from {client_address}{c.COLOR_RESET}")
     handler: ClientHandler = ClientHandler(client_socket=client_socket)
     CLIENTS_HANDLERS.append(handler)
-    handler.recieve_name()
+    handler.receive_name()
 
 
 def filter_clients_handlers() -> None:

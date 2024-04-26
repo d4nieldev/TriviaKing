@@ -5,11 +5,11 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 1.  !!DONE!! Add colors to Client and Server prints (Guy)
 2.  !!DONE!!  Fix connection from MAC (Dani)
 3.  Run from 2 computers, not with self IP (Guy + Dani) 
-4.  E!!DONE!! rror handeling - disconnection of client? (Dani)
+4.  !!DONE!! Error handeling - disconnection of client? (Dani)
 5.  !!DONE!! Server needs to start over after game concludes (Dani)
 6.  !!DONE!! Test if client type not P or B - loop prevails? (Shahar)
 7.  !!DONE!! Add "quit" point to the server - no more new games - max #games (Dani)
-8.  ???? Make sure players stay in the game (not disconnecting) once a game is over (Dani)
+8.  !!DONE!! Make sure players stay in the game once a game is over (Dani)
 9.  !!DONE!! Finish data structure for results of the games - global for the server (Shahar)
 10. !!DONE!! Mark where to calculate and present comments (Dani)
 11. !!DONE!! Discriptive statistics for the players participated - Tournament. Table ASCII art (Shahar)
@@ -25,7 +25,7 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 18. !!DONE!! Test all edge cases of disconnection to client / server (ALL)
 19. !!DONE!! Team Name should hard coded in the client (global). Create list and change in __main__(Shahar)
 20. "Work with any client and any server" - What? Ask around (Shahar)
-21. Add FUCKING documentation YA PIECES OF SHIT (ALL)
+21. !!DONE!! Add FUCKING documentation YA PIECES OF SHIT (ALL)
 22. !!DONE!! Replace all key and strings and const num in Client with constants (Shahar)
 23. Replace all key and strings and const num in Server with constants (Guy + Dani)
 24. "Network code is isolated to a single network" - What? Ask around (Shahar)
@@ -36,5 +36,10 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 29. !!DONE!! I think we are wrong and 1 round is the loop until 1 player left standing (and the game is only one round) (Shahar let me know)
 30. !!DONE!! Need to create try-catch for client - in case of server error (Shahar)
 31. !!DONE!! Add input to client before a new Game (Shahar)
+32. !! MAC - Done!! Verify edge cases (Mac - Dani, Windows - Shahar):
+    Server collapsed
+    Client collapsed:
+        - Before questions were sent
+        - After questions were sent (Mid-Game)
 
 

@@ -27,7 +27,6 @@ CLIENT_TEAM_NAMES = [
     "Cult Fiction Fact-Checkers",
     "Bloody Brilliant Minds",
     "Fellowship of the Quiz",
-    "The Godfather’s Godchildren",
     "Shutter Island Shapeshifters",
     "Sherlocked Minds",
     "Quizteros of Westeros",

@@ -9,7 +9,7 @@ import sys
 try:
     import msvcrt
 except ImportError:
-    # on mac
+    # on MAC
     pass
 
 PRINT_LOCK = threading.Lock()
@@ -17,8 +17,13 @@ BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
 
 def safe_print(*args, **kwargs):
+    '''
+    Makes sure that prints to screen are handeled properly when received from 
+    multiple threads.
+    '''
     with PRINT_LOCK:
         print(*args, **kwargs)
+
 
 class Client:
     def __init__(self, bot=False, bot_level = None):
@@ -39,17 +44,30 @@ class Client:
         self.answer = None # Input recieved by manual player
         self.curr_question = None  # Current question in game
 
+
     @classmethod
     def generate_bot_name(cls):
+        '''
+        Automatically generate a valid bot name using a set prefix "BOT_#..."
+        and a random number assignment.
+        2 bot names will not be the same (under the same server), as the numbers
+        are monitored in a class variable.
+        '''
         while True:
             random_number = random.randint(1, 99999999999)  # Generate a random number
             if random_number not in BOT_USED_NUMBERS:
                 BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
                 # Return the unique bot team name
                 return f"BOT_#{random_number}"
+
     
     @classmethod
     def generate_team_name(cls):
+        '''
+        Automatically generate a team name from a const list of names.
+        2 player names will not be the same (under the same server), as the active names
+        are monitored in a class variable.
+        '''
         while True:
             random_name = random.choice(c.CLIENT_TEAM_NAMES)  # Generate a random name
             if random_name not in TEAM_USED_NAMES:
@@ -57,7 +75,20 @@ class Client:
                 # Return the unique bot team name
                 return random_name
 
+
     def answer_the_bloody_question(self):
+        '''
+        Handle answering the question.
+        For Bots:
+        Depending on the bot level, as a probability of choosing the right answer,
+        return an answer to the current question, saved as a class variable. Answer is returned
+        directly from questions.py file.
+        For human clients:
+        Activate input thread while waiting for the client to enter an answer in 
+        wait_for_input()
+        
+        Return client / bot answer or None, if no valid answer was given.
+        '''
         if self.bot:
             # Get the correct answer for the current question from the dictionary
             correct_ans = QUESTIONS_DICT[self.curr_question]
@@ -75,11 +106,21 @@ class Client:
             safe_print(f"{c.COLOR_RED}Answer exeeded answer length, sending '{ans[0]}'{c.COLOR_RESET}")
         return ans[0] if ans else None
 
+
     def transition_state(self, new_state):
+        '''
+        Change client's state without giving the activator of the function direct
+        access to class attributes.
+        '''
         self.state = new_state
         safe_print(f"{self.team_name} transitioned to state: {new_state}")
 
+
     def parse_broadcast_message(self, data: bytes):
+        '''
+        Parse the message received from the server, while verifying it's structure.
+        Extract server name and port from message
+        '''
         # Expected format of the received packet
         # Big-endian unsigned int, unsigned byte, 32-byte string, unsigned short
         format_specifier = '>IB32sH'
@@ -97,7 +138,12 @@ class Client:
 
         return server_name, server_port
 
+
     def find_server(self):
+        '''
+        Look for an available game server using a UDP connection.
+        Function can handle connections both on Windows and Mac computers.
+        '''
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             try:
                 # Different commands between MAC and Windows
@@ -122,6 +168,9 @@ class Client:
                 safe_print(f"{c.COLOR_RED}[{self.team_name}]: No server broadcasts received.{c.COLOR_RESET}")
 
     def connect_to_server(self):
+        '''
+        Establish a TCP connection with the found game server and send the team name
+        '''
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.tcp_socket.connect((self.server_ip, self.server_port))
@@ -134,6 +183,9 @@ class Client:
             self.disconnect()
 
     def listen_to_server(self):
+        '''
+        Receive messages via TCP connection from server to client.
+        '''
         while True:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
@@ -153,9 +205,12 @@ class Client:
                 break
     
     def wait_for_input(self):
+        '''
+        Recieve user input in thread while not blocking incoming server messages
+        '''
         self.received_new_message.clear()
         ans = None
-        safe_print("Current question: ", self.curr_question)
+        # safe_print("Current question: ", self.curr_question)
         safe_print("Answer: ", end='', flush=True)
         while not self.received_new_message.is_set():
             try:
@@ -173,6 +228,13 @@ class Client:
         return ans
 
     def game_mode(self):
+        '''
+        Manage game communication on client side
+        1. Get server messages from queue
+        2. Identify message type (welcome, error, question...)
+        3. Parse message content properly
+        4. Handle.
+        '''
         self.curr_question = None
         was_error = False
 
@@ -212,6 +274,9 @@ class Client:
                 safe_print(f"{c.COLOR_YELLOW}{server_message}{c.COLOR_RESET}")
 
     def disconnect(self):
+        '''
+        Close connection from server (errors)
+        '''
         if self.tcp_socket:
             self.tcp_socket.close()
             safe_print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
@@ -219,11 +284,21 @@ class Client:
             self.connected = False
     
     def reconnect(self):
+        '''
+        Close connection with current server and open player to look for other 
+        available servers.
+        '''
         self.disconnect()
         _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish {self.team_name} to reconnect to the game server{c.COLOR_RESET}")
         self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
 
     def run(self):
+        '''
+        Handle the 3 client statets
+        1. Looking for server
+        2. Found server, connect
+        3. Game
+        '''
         while True:            
             if self.state == c.CLIENT_STATE_LOOKING_FOR_SERVER:
                 self.find_server()
@@ -235,8 +310,8 @@ class Client:
 
 def create_player(bot=False, bot_level_str='c'):
     '''
-    External method to create players, both human and bots, 
-    in order to activate as a thread worker if necessary.
+    External method from class to create players (class instances), both human and bots.
+    Bots are created in threads, so an external worker function like this is needed.
     '''
     if bot:
         client = Client(bot=True, bot_level=c.BOT_LEVELS.get(bot_level_str, None))
