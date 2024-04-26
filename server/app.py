@@ -4,14 +4,13 @@ import struct
 import time
 import random
 import select
-from collections import Counter
 
 from questions import QUESTIONS
 import constants as c
 import statistic as stats
 
 
-GAME_RUNNING: bool = False
+GAME_RUNNING = False
 SENT_QUESTION_CONDITION: threading.Condition = threading.Condition()
 SENT_QUESTION: bool = False
 WAIT_FOR_ANSWERS_CONDITION: threading.Condition = threading.Condition()
@@ -31,7 +30,7 @@ class ClientHandler:
         # get client name
         message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
         self.name = message.split(c.CLIENT_NAME_TERMINATION)[0]
-        print(f"{self.name} connected!")
+        print(f"{c.COLOR_GREEN}{self.name} connected!{c.COLOR_RESET}")
 
     def reset_state(self):
         self.thread: threading.Thread = threading.Thread(target=self.handle)
@@ -39,12 +38,14 @@ class ClientHandler:
         self.answered: bool = False
         self.correct: bool = None
         self.in_game: bool = True
+        self.exit_gracefully: bool = False
         
     def start(self):
         self.reset_state()
         self.thread.start()
 
     def join(self):
+        self.exit_gracefully = True
         self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
         self.thread.join()
 
@@ -72,7 +73,7 @@ class ClientHandler:
     def handle(self):
         self.in_game = True
 
-        while self.in_game and GAME_RUNNING:
+        while GAME_RUNNING and self.in_game:
             # get answer from client
             answer = None
             with SENT_QUESTION_CONDITION:
@@ -85,7 +86,6 @@ class ClientHandler:
                     response_ready, _, _ = select.select([self.socket], [], [], c.SERVER_NO_ANSWER_TIMEOUT_SEC)
                     if response_ready:
                         response = self.socket.recv(c.CLIENT_ANSWER_PACKET_SIZE)
-                        print(f"Got response from {self.name}: {response}")
                     else:
                         # did not get response from client
                         print(f"{self.name} did not answer in time.")
@@ -93,10 +93,14 @@ class ClientHandler:
                         break
                 except Exception:
                     print(f"Error while recieving answer from client {self.name}")
-                    self.disconnect()
+                    if not self.exit_gracefully:
+                        self.disconnect()
                     return  # kill the thread
-                if not response:
-                    self.disconnect()
+                if response:
+                    print(f"Got response from {self.name}: {response}")
+                else:
+                    if not self.exit_gracefully:
+                        self.disconnect()
                     return  # kill the thread
                 
                 answer = response.decode()
@@ -115,7 +119,6 @@ class ClientHandler:
             # nofify the main thread that another player answered
             with WAIT_FOR_ANSWERS_CONDITION:
                 WAIT_FOR_ANSWERS_CONDITION.notify()
-    
 
             # wait for all answers to be checked
             with ANSWERS_CHECKED_CONDITION:
@@ -146,6 +149,19 @@ def get_ip_address() -> str:
         s.close()
     return ip_address
 
+def is_socket_closed(sock: socket.socket) -> bool:
+    try:
+        # this will try to read bytes without blocking and also without removing them from buffer (peek only)
+        data = sock.recv(1, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+        if len(data) == 0:
+            return True
+    except BlockingIOError:
+        return False  # socket is open and reading from it would block
+    except ConnectionResetError:
+        return True  # socket was closed for some other reason
+    except Exception:
+        return False
+    return False
 
 def create_broadcast_packet(server_name: str, server_port: int) -> bytes:
     # Constructing the message with the specified format
@@ -185,27 +201,37 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
 
 def handle_new_connection(client_socket: socket.socket, client_address: tuple) -> None:
-    print("New connection from ", client_address)
+    print(f"{c.COLOR_YELLOW}New connection from {client_address}{c.COLOR_RESET}")
     handler: ClientHandler = ClientHandler(client_socket=client_socket)
     CLIENTS_HANDLERS.append(handler)
+    handler.recieve_name()
+
+
+def filter_clients_handlers() -> None:
+    for ch in CLIENTS_HANDLERS:
+        if is_socket_closed(ch.socket):
+            ch.disconnect()
 
 
 def handle_incoming_connections(server_socket: socket.socket) -> None:
     # Accept incoming connections
     while True:
+        if len(CLIENTS_HANDLERS) < c.MIN_TEAMS:
+            print("Waiting for more players to join...")
+            server_socket.settimeout(None)
+        if len(CLIENTS_HANDLERS) == c.MIN_TEAMS:
+            print(f"Minimum number of players reached. Other players have {c.CLIENT_NO_JOIN_TIMEOUT_SEC} seconds.")
+            server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
         try:
             (client_socket, client_address) = server_socket.accept()
             handle_new_connection(client_socket, client_address)
+            filter_clients_handlers()
         except socket.timeout:
             print("Stopped listening for new connections.")
             break
 
 
-def send_welcome_message() -> None:
-    # recieve names from all clients
-    for ch in CLIENTS_HANDLERS:
-        ch.recieve_name()
-        
+def send_welcome_message() -> None:        
     welcome_message = f'Welcome to {c.SERVER_NAME} trivia king!\n'
     for i, ch in enumerate(CLIENTS_HANDLERS):
         welcome_message += f'Player {i + 1}: {ch.name}\n'
@@ -222,19 +248,18 @@ def get_in_game_players() -> list[ClientHandler]:
 
 
 def game_loop() -> ClientHandler:
-    global GAME_RUNNING
     global SENT_QUESTION
     global ANSWERS_CHECKED
+    global GAME_RUNNING
 
     SENT_QUESTION = False
     ANSWERS_CHECKED = False
+    GAME_RUNNING = True
 
     round_num = 1
 
     def get_round_start_message() -> str:
         return f"Round {round_num} is starting in {c.ROUND_PAUSE_SEC} seconds. Get ready..."
-
-    GAME_RUNNING = True
 
     for ch in CLIENTS_HANDLERS:
         ch.start()
@@ -265,12 +290,12 @@ def game_loop() -> ClientHandler:
         question, answer = QUESTIONS[question_index]
         
         # send the question to all players
-        for client_handler in get_in_game_players():
-            client_handler.send_message(c.QUESTION_MESSAGE, question)
+        for ch in get_in_game_players():
+            ch.send_message(c.QUESTION_MESSAGE, question)
 
+        SENT_QUESTION = True
+        ANSWERS_CHECKED = False
         with SENT_QUESTION_CONDITION:
-            SENT_QUESTION = True
-            ANSWERS_CHECKED = False
             SENT_QUESTION_CONDITION.notify_all()
 
         print(f"{c.COLOR_BLUE}Sent question: {question} (answer: {answer}){c.COLOR_RESET}")
@@ -287,11 +312,11 @@ def game_loop() -> ClientHandler:
         if len(get_in_game_players()) > 1:
             correct_players: list[ClientHandler] = []
             incorrect_players: list[ClientHandler] = []
-            for client_handler in get_in_game_players():
-                if client_handler.answer == answer:
-                    correct_players.append(client_handler)
+            for ch in get_in_game_players():
+                if ch.answer == answer:
+                    correct_players.append(ch)
                 else:
-                    incorrect_players.append(client_handler)
+                    incorrect_players.append(ch)
             
             print(f"{c.COLOR_GREEN}Correct players: {', '.join([ch.name for ch in correct_players])}{c.COLOR_RESET}")
             print(f"{c.COLOR_RED}Incorrect players: {', '.join([ch.name for ch in incorrect_players])}{c.COLOR_RESET}")
@@ -303,20 +328,19 @@ def game_loop() -> ClientHandler:
                 for ch in get_in_game_players():
                     ch.send_message(c.GENERAL_MESSAGE, msg)
             else:
-                for client_handler in correct_players:
-                    client_handler.correct = True
+                for ch in correct_players:
+                    ch.correct = True
 
-                for client_handler in incorrect_players:
-                    client_handler.correct = False
-                    client_handler.disqualify()
+                for ch in incorrect_players:
+                    ch.correct = False
+                    ch.disqualify()
             
                 # let players know who is still in the game:
                 for ch in get_in_game_players():
                     msg = f"{c.COLOR_GREEN}You are correct!{c.COLOR_RESET}"
                     ch.send_message(c.GENERAL_MESSAGE, msg)
-                
         
-        if len(get_in_game_players()) == 1:
+        if len(get_in_game_players()) <= 1:
             GAME_RUNNING = False
             
         SENT_QUESTION = False
@@ -328,7 +352,7 @@ def game_loop() -> ClientHandler:
         round_num += 1
 
     winner = get_in_game_players()[0]
-    print("waiting for clients to exit normally...")
+    print("waiting for clients to exit gracefully...")
     for ch in CLIENTS_HANDLERS:
         ch.join()
 
@@ -346,6 +370,10 @@ def send_game_over_message(winner: str):
         else:
             msg = f"The winner is: {winner}"
         ch.send_message(c.GAME_OVER_MESSAGE, msg)
+
+    time.sleep(c.SERVER_POST_GAME_OVER_DISCONNECT_TIMEOUT_SEC)
+
+    for ch in clients_handlers:
         ch.disconnect()
 
 
@@ -358,7 +386,6 @@ def listen(server_port: int = 0) -> None:
     # Create a TCP socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Bind the socket to the address and port
-        server_socket.settimeout(c.CLIENT_NO_JOIN_TIMEOUT_SEC)
         server_socket.bind((ip_address, server_port))
         server_port = server_socket.getsockname()[1]
         server_socket.listen()

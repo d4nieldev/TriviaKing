@@ -12,8 +12,13 @@ except ImportError:
     # on mac
     pass
 
+PRINT_LOCK = threading.Lock()
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
+
+def safe_print(*args, **kwargs):
+    with PRINT_LOCK:
+        print(*args, **kwargs)
 
 class Client:
     def __init__(self, bot=False, bot_level = None):
@@ -52,10 +57,10 @@ class Client:
                 # Return the unique bot team name
                 return random_name
 
-    def answer_the_bloody_question(self):        
+    def answer_the_bloody_question(self):
         if self.bot:
             # Get the correct answer for the current question from the dictionary
-            correct_ans = QUESTIONS_DICT.get(self.curr_question, None)
+            correct_ans = QUESTIONS_DICT[self.curr_question]
             # Decide whether to answer correctly based on the bot's level
             if random.random() < self.bot_level:
                 ans = correct_ans
@@ -63,16 +68,16 @@ class Client:
                 ans = not correct_ans
             # Map Boolean answer to string
             ans = c.TRUE_ANSWERS[1] if ans else c.FALSE_ANSWERS[1]
-            print(f"Answer: {ans}")
+            safe_print(f"Answer: {ans}")
         else:
             ans = self.wait_for_input()
         if ans is not None and len(ans) > 1:
-            print(f"{c.COLOR_RED}Answer exeeded answer length, sending '{ans[0]}'{c.COLOR_RESET}")
+            safe_print(f"{c.COLOR_RED}Answer exeeded answer length, sending '{ans[0]}'{c.COLOR_RESET}")
         return ans[0] if ans else None
 
     def transition_state(self, new_state):
         self.state = new_state
-        print(f"{self.team_name} transitioned to state: {new_state}")
+        safe_print(f"{self.team_name} transitioned to state: {new_state}")
 
     def parse_broadcast_message(self, data: bytes):
         # Expected format of the received packet
@@ -103,18 +108,18 @@ class Client:
             # Bind to the broadcast port
             udp_socket.bind(('', c.BROADCAST_PORT))
             try:
-                print(f"{self.team_name} is listening for server broadcasts...")
+                safe_print(f"{self.team_name} is listening for server broadcasts...")
                 data, addr = udp_socket.recvfrom(self.BUFFER_SIZE)
                 self.server_ip = addr[0]
                 
                 self.server_name,  self.server_port = self.parse_broadcast_message(data)
 
-                print(f"{self.team_name} Received broadcast from {addr},"
+                safe_print(f"{self.team_name} Received broadcast from {addr},"
                       f" server name {self.server_name}")
                 self.transition_state(c.CLIENT_STATE_CONNECTING_TO_SERVER)
 
             except socket.timeout:
-                print(f"{c.COLOR_RED}[{self.team_name}]: No server broadcasts received.{c.COLOR_RESET}")
+                safe_print(f"{c.COLOR_RED}[{self.team_name}]: No server broadcasts received.{c.COLOR_RESET}")
 
     def connect_to_server(self):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -122,10 +127,10 @@ class Client:
             self.tcp_socket.connect((self.server_ip, self.server_port))
             self.tcp_socket.send((self.team_name + '\n').encode())
             self.connected = True
-            print(f"{self.team_name} connected to the server and sent player name.")
+            safe_print(f"{self.team_name} connected to the server and sent player name.")
             self.transition_state(c.CLIENT_STATE_GAME_MODE)
         except Exception as e:
-            print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
+            safe_print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
             self.disconnect()
 
     def listen_to_server(self):
@@ -133,12 +138,12 @@ class Client:
             try:
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
                 if not data:
-                    print(f'{c.COLOR_RED}server disconnected. reconnecting...{c.COLOR_RESET}')
+                    safe_print(f'{c.COLOR_RED}server disconnected. reconnecting...{c.COLOR_RESET}')
                     self.reconnect()
                 self.received_new_message.set()
+                new_server_messages = data.decode().split(c.SERVER_MSG_TERMINATION)
+                new_server_messages = [msg for msg in new_server_messages if len(msg) > 0]
                 with self.server_messages_pending_condition:
-                    new_server_messages = data.decode().split(c.SERVER_MSG_TERMINATION)
-                    new_server_messages = [msg for msg in new_server_messages if len(msg) > 0]
                     self.server_messages += new_server_messages
                     self.server_messages_pending_condition.notify()
             except ConnectionAbortedError:
@@ -146,24 +151,16 @@ class Client:
                 break
             except OSError:
                 break
-
-    def clear_input(self):
-        try:
-            while msvcrt.kbhit():
-                msvcrt.getch()
-        except NameError:
-            import sys, termios    #for linux/unix
-            termios.tcflush(sys.stdin, termios.TCIOFLUSH)
     
     def wait_for_input(self):
         self.received_new_message.clear()
-        self.clear_input()
         ans = None
-        print("Answer: ", end='', flush=True)
+        safe_print("Current question: ", self.curr_question)
+        safe_print("Answer: ", end='', flush=True)
         while not self.received_new_message.is_set():
             try:
                 # Use select to check if there is input available without blocking
-                input_ready, _, _ = select.select([sys.stdin], [], [], 0.01)
+                input_ready, _, _ = select.select([sys.stdin], [], [], 0.1)
                 if input_ready:
                     # Read user input
                     ans = sys.stdin.readline().rstrip()
@@ -186,48 +183,44 @@ class Client:
                 with self.server_messages_pending_condition:
                     if len(self.server_messages) == 0:
                         self.server_messages_pending_condition.wait()
-                    if not len(self.server_messages) == 0:    
-                        data = self.server_messages.pop(0)
-                    else:
-                       self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER) 
+
+                    server_message = self.server_messages.pop(0)
             else:
-                data = self.curr_question
+                server_message = c.QUESTION_MESSAGE + self.curr_question
                 was_error = False
 
-            server_message = data
             if server_message.startswith(c.WELCOME_MESSAGE):
                 server_message = server_message.replace(c.WELCOME_MESSAGE, "")
-                print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
+                safe_print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
             elif server_message.startswith(c.ERROR_MESSAGE):
                 server_message = server_message.replace(c.ERROR_MESSAGE, "")
-                print(f"{c.COLOR_RED}Error: {server_message}{c.COLOR_RESET}")
-                server_message = self.curr_question
+                safe_print(f"{c.COLOR_RED}Error: {server_message}{c.COLOR_RESET}")
                 was_error = True
             elif server_message.startswith(c.QUESTION_MESSAGE):
-                self.curr_question = server_message
                 server_message = server_message.replace(c.QUESTION_MESSAGE, "")
-                print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
+                self.curr_question = server_message
+                safe_print(f"{c.COLOR_BLUE}Question: {server_message}{c.COLOR_RESET}")
                 ans = self.answer_the_bloody_question()
                 if ans is not None:
                     self.tcp_socket.sendall(ans.encode())
             elif server_message.startswith(c.GAME_OVER_MESSAGE):
                 server_message = server_message.replace(c.GAME_OVER_MESSAGE, "")
-                print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
+                safe_print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
                 self.reconnect()
             elif server_message.startswith(c.GENERAL_MESSAGE):
                 server_message = server_message.replace(c.GENERAL_MESSAGE, "")
-                print(f"{c.COLOR_YELLOW}{server_message}{c.COLOR_RESET}")
+                safe_print(f"{c.COLOR_YELLOW}{server_message}{c.COLOR_RESET}")
 
     def disconnect(self):
         if self.tcp_socket:
             self.tcp_socket.close()
-            print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
+            safe_print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
             self.tcp_socket = None
             self.connected = False
     
     def reconnect(self):
         self.disconnect()
-        _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish to reconnect to the game server{c.COLOR_RESET}")
+        _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish {self.team_name} to reconnect to the game server{c.COLOR_RESET}")
         self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
 
     def run(self):
@@ -250,7 +243,7 @@ def create_player(bot=False, bot_level_str='c'):
         client.run()
     else:
         client = Client(bot=False)
-        print(f"{c.COLOR_BLUE}Your team name is: {client.team_name}{c.COLOR_RESET}")
+        safe_print(f"{c.COLOR_BLUE}Your team name is: {client.team_name}{c.COLOR_RESET}")
         client.run()
     return
 
@@ -267,12 +260,12 @@ if __name__ == '__main__':
                         raise Exception("Number of bost needs to be greater than 0.")
                     break
                 except Exception:
-                    print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
+                    safe_print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
                     continue
             while True:
                 bot_level_str = input("""\nHow smart would you like the bot to be?\nPress 'A' for Sheldon Cooper smart\nPress 'B' for Brainy Smurf smart\nPress 'C' for average US public school smart\nPress 'D' for Dumb as Fu*k\n""").lower().strip()
                 if bot_level_str not in ['a','b','c','d']:
-                    print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
+                    safe_print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
                     continue
                 break
             threads = []
@@ -291,4 +284,4 @@ if __name__ == '__main__':
             create_player(bot=False)
             break
         else:
-            print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
+            safe_print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
