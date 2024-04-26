@@ -26,7 +26,15 @@ class ClientHandler:
         self.name: str = None
         self.reset_state()
 
-    def recieve_name(self):
+    def receive_name(self):
+        """
+        Receives the client's name from the socket connection.
+
+        This method receives the client's name from the socket connection and sets it as the name attribute of the class instance.
+
+        Returns:
+            None
+        """
         # get client name
         message = self.socket.recv(c.CLIENT_NAME_PACKET_SIZE).decode()
         self.name = message.split(c.CLIENT_NAME_TERMINATION)[0]
@@ -45,15 +53,30 @@ class ClientHandler:
         self.thread.start()
 
     def join(self):
+        """
+        Gracefully exits the server by shutting down the socket and joining the thread.
+        """
         self.exit_gracefully = True
         self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
         self.thread.join()
 
     def disqualify(self):
+        """
+        Disqualifies the player from the game.
+        
+        Sets the 'in_game' attribute to False and sends a message to the player indicating their disqualification.
+        """
         self.in_game = False
-        self.send_message(c.GENERAL_MESSAGE, "You are not the shapest pencil in the case, try better in the next game!")
+        self.send_message(c.GENERAL_MESSAGE, "You are not the sharpest pencil in the case, try better in the next game!")
 
     def disconnect(self):
+        """
+        Disconnects the client from the server.
+
+        This method closes the client's socket connection, removes the client from the list of active handlers,
+        sets the client's `in_game` flag to False, and notifies any waiting threads that are waiting for answers.
+
+        """
         with CLIENTS_HANDLERS_LOCK:
             if self in CLIENTS_HANDLERS:
                 self.socket.close()
@@ -64,13 +87,33 @@ class ClientHandler:
                     WAIT_FOR_ANSWERS_CONDITION.notify()
     
     def send_message(self, message_type: str, message: str) -> None:
-        message = message_type + message + c.SERVER_MSG_TERMINATION
-        try:
-            self.socket.sendall(message.encode())
-        except BrokenPipeError:
-            self.disconnect()
+            """
+            Sends a message to the connected socket.
+
+            Args:
+                message_type (str): The type of the message.
+                message (str): The content of the message.
+
+            Returns:
+                None
+            """
+            message = message_type + message + c.SERVER_MSG_TERMINATION
+            try:
+                self.socket.sendall(message.encode())
+            except BrokenPipeError:
+                self.disconnect()
 
     def handle(self):
+        """
+        Handles the logic for a player's turn in the game.
+
+        This method is responsible for receiving and processing the player's answer,
+        notifying the main thread when the player has answered, and waiting for all
+        answers to be checked before proceeding.
+
+        Returns:
+            None
+        """
         self.in_game = True
 
         while GAME_RUNNING and self.in_game:
@@ -92,7 +135,7 @@ class ClientHandler:
                         response = None
                         break
                 except Exception:
-                    print(f"Error while recieving answer from client {self.name}")
+                    print(f"Error while reciving answer from client {self.name}")
                     if not self.exit_gracefully:
                         self.disconnect()
                     return  # kill the thread
@@ -139,7 +182,15 @@ CLIENTS_HANDLERS: list[ClientHandler] = []
 CLIENTS_HANDLERS_LOCK: threading.Lock = threading.Lock()
 
 
+import socket
+
 def get_ip_address() -> str:
+    """
+    Get the IP address of the current machine.
+
+    Returns:
+        str: The IP address of the current machine.
+    """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # Connect to any IP (here we choose Google's public DNS server)
@@ -150,6 +201,15 @@ def get_ip_address() -> str:
     return ip_address
 
 def is_socket_closed(sock: socket.socket) -> bool:
+    """
+    Check if a socket is closed or not.
+
+    Args:
+        sock (socket.socket): The socket to check.
+
+    Returns:
+        bool: True if the socket is closed, False otherwise.
+    """
     try:
         # this will try to read bytes without blocking and also without removing them from buffer (peek only)
         data = sock.recv(1, socket.MSG_DONTWAIT | socket.MSG_PEEK)
@@ -164,6 +224,17 @@ def is_socket_closed(sock: socket.socket) -> bool:
     return False
 
 def create_broadcast_packet(server_name: str, server_port: int) -> bytes:
+    """
+    Creates a broadcast packet for the TriviaKing server.
+
+    Args:
+        server_name (str): The name of the server.
+        server_port (int): The port number of the server.
+
+    Returns:
+        bytes: The constructed UDP packet.
+    """
+    
     # Constructing the message with the specified format
     magic_cookie = struct.pack('>I', c.BROADCAST_MAGIC_COOKIE)
     message_type = struct.pack('B', c.BROADCAST_MESSAGE_TYPE)
@@ -180,6 +251,18 @@ def create_broadcast_packet(server_name: str, server_port: int) -> bytes:
 
 
 def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
+    """
+    Continuously sends broadcast packets to the network.
+
+    Args:
+        ip_address (str): The IP address to bind the socket to.
+        server_name (str): The name of the server.
+        server_port (int): The port number of the server.
+
+    Returns:
+        None
+    """
+    
     # Creating the UDP packet
     udp_packet = create_broadcast_packet(server_name=server_name,
                                          server_port=server_port)
@@ -201,6 +284,16 @@ def broadcast_loop(ip_address: str, server_name: str, server_port: int) -> None:
 
 
 def handle_new_connection(client_socket: socket.socket, client_address: tuple) -> None:
+    """
+    Handles a new client connection.
+
+    Args:
+        client_socket (socket.socket): The socket object representing the client connection.
+        client_address (tuple): The address of the client.
+
+    Returns:
+        None
+    """
     print(f"{c.COLOR_YELLOW}New connection from {client_address}{c.COLOR_RESET}")
     handler: ClientHandler = ClientHandler(client_socket=client_socket)
     CLIENTS_HANDLERS.append(handler)
@@ -208,12 +301,24 @@ def handle_new_connection(client_socket: socket.socket, client_address: tuple) -
 
 
 def filter_clients_handlers() -> None:
+    """
+    Filters the list of client handlers and disconnects any closed sockets.
+    """
     for ch in CLIENTS_HANDLERS:
         if is_socket_closed(ch.socket):
             ch.disconnect()
 
 
 def handle_incoming_connections(server_socket: socket.socket) -> None:
+    """
+    Accepts incoming connections from clients and handles them.
+
+    Args:
+        server_socket (socket.socket): The server socket object.
+
+    Returns:
+        None
+    """
     # Accept incoming connections
     while True:
         if len(CLIENTS_HANDLERS) < c.MIN_TEAMS:
@@ -231,7 +336,15 @@ def handle_incoming_connections(server_socket: socket.socket) -> None:
             break
 
 
-def send_welcome_message() -> None:        
+def send_welcome_message() -> None:
+    """
+    Sends a welcome message to all players connected to the server.
+
+    The welcome message includes the server name and a list of connected players.
+
+    Returns:
+        None
+    """
     welcome_message = f'Welcome to {c.SERVER_NAME} trivia king!\n'
     for i, ch in enumerate(CLIENTS_HANDLERS):
         welcome_message += f'Player {i + 1}: {ch.name}\n'
@@ -239,15 +352,27 @@ def send_welcome_message() -> None:
 
     # send welcome message to every player
     for ch in CLIENTS_HANDLERS:
-        msg = f"Hello, comrad {ch.name}!\n"
+        msg = f"Hello, comrade {ch.name}!\n"
         msg += welcome_message
         ch.send_message(c.WELCOME_MESSAGE, msg)
 
 def get_in_game_players() -> list[ClientHandler]:
+    """
+    Returns a list of ClientHandler objects representing players who are currently in a game.
+    
+    Returns:
+        list[ClientHandler]: A list of ClientHandler objects representing players in a game.
+    """
     return [ch for ch in CLIENTS_HANDLERS if ch.in_game]
 
 
 def game_loop() -> ClientHandler:
+    """
+    Main game loop that handles the flow of the trivia game.
+
+    Returns:
+        ClientHandler: The winner of the game.
+    """
     global SENT_QUESTION
     global ANSWERS_CHECKED
     global GAME_RUNNING
@@ -360,6 +485,15 @@ def game_loop() -> ClientHandler:
     
 
 def send_game_over_message(winner: str):
+    """
+    Sends a game over message to all clients, indicating the winner of the game.
+
+    Args:
+        winner (str): The name of the winner.
+
+    Returns:
+        None
+    """
     clients_handlers = list(CLIENTS_HANDLERS)
     for ch in clients_handlers:
         msg = None
@@ -378,6 +512,16 @@ def send_game_over_message(winner: str):
 
 
 def listen(server_port: int = 0) -> None:
+    """
+    Listens for incoming connections on the specified server port.
+
+    Args:
+        server_port (int): The port number to listen on. Defaults to 0, which allows the operating system to assign an available port.
+
+    Returns:
+        None
+    """
+    
     global SEND_BROADCAST
     global CLIENTS_HANDLERS
 
