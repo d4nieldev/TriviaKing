@@ -43,7 +43,9 @@ Before you begin, ensure you have the following installed:
 ## 📞 Contact us
 
 Shahar Oded - odedshah@post.bgu.ac.il
+
 Daniel Ohayun - danieloh@post.bgu.ac.il
+
 Guy Zagorsky - guyzagor@post.bgu.ac.il
 
 
