@@ -24,11 +24,11 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
     - I added the input within a thread, but I see that the server is not sending anything after 10 sec. Is it already working? (Dani)
 18. !!DONE!! Test all edge cases of disconnection to client / server (ALL)
 19. !!DONE!! Team Name should hard coded in the client (global). Create list and change in __main__(Shahar)
-20. "Work with any client and any server" - What? Ask around (Shahar)
+20. !!DONE!! "Work with any client and any server" - What? Ask around (Shahar)
 21. !!DONE!! Add FUCKING documentation YA PIECES OF SHIT (ALL)
 22. !!DONE!! Replace all key and strings and const num in Client with constants (Shahar)
 23. !!DONE!! Replace all key and strings and const num in Server with constants (Guy + Dani)
-24. "Network code is isolated to a single network" - What? Ask around (Shahar)
+24. !!DONE!! "Network code is isolated to a single network" - What? Ask around (Shahar)
 25. !!NEVER MIND!! You cannot add more then len(c.CLIENT_TEAM_NAMES) manual players to the game. Maybe that should be stated somewhere
 26. !!DONE!! If invalid answer inputed - is it not automatically terminating the player? I pressed nothing and the game stuck (Dani)
 27. !!DONE!! Set bot difficulity modes (dumb as fuck - 0.3, data engineering student - 0.5, smartass - 0.7, software engineering student - 1.0) (Shahar)
