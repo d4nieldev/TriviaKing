@@ -188,6 +188,11 @@ class Client:
         '''
         while True:
             try:
+                if self.tcp_socket is None:
+                    safe_print(f'{c.COLOR_RED}No connection to the server. Attempting to reconnect...{c.COLOR_RESET}')
+                    self.reconnect()
+                    continue  # Continue to the next iteration of the loop after attempting to reconnect
+                
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
                 if not data:
                     safe_print(f'{c.COLOR_RED}server disconnected. reconnecting...{c.COLOR_RESET}')
@@ -198,11 +203,10 @@ class Client:
                 with self.server_messages_pending_condition:
                     self.server_messages += new_server_messages
                     self.server_messages_pending_condition.notify()
-            except ConnectionAbortedError:
+            except (ConnectionAbortedError, OSError) as e:
                 self.reconnect()
                 break
-            except OSError:
-                break
+            
     
     def wait_for_input(self):
         '''

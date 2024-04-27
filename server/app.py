@@ -67,7 +67,7 @@ class ClientHandler:
         Sets the 'in_game' attribute to False and sends a message to the player indicating their disqualification.
         """
         self.in_game = False
-        self.send_message(c.GENERAL_MESSAGE, "You are not the sharpest pencil in the case, try better in the next game!")
+        self.send_message(c.GENERAL_MESSAGE, "We hope your brain is not your strongest muscle, try better in the next game!")
 
     def disconnect(self):
         """
@@ -88,7 +88,7 @@ class ClientHandler:
     
     def send_message(self, message_type: str, message: str) -> None:
             """
-            Sends a message to the connected socket.
+            Sends a message to the connected socket while ignoring broken ones
 
             Args:
                 message_type (str): The type of the message.
@@ -100,7 +100,7 @@ class ClientHandler:
             message = message_type + message + c.SERVER_MSG_TERMINATION
             try:
                 self.socket.sendall(message.encode())
-            except BrokenPipeError:
+            except (BrokenPipeError, ConnectionResetError):
                 self.disconnect()
 
     def handle(self):

@@ -37,9 +37,9 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 30. !!DONE!! Need to create try-catch for client - in case of server error (Shahar)
 31. !!DONE!! Add input to client before a new Game (Shahar)
 32. !! MAC - Done!! Verify edge cases (Mac - Dani, Windows - Shahar):
-    Server collapsed
+    !!DONE!! Server collapsed
     Client collapsed:
-        - Before questions were sent
-        - After questions were sent (Mid-Game)
+        - Before questions were sent - Stuck on "waiting for clients to exit gracefully..."?
+        - !!DONE!! After questions were sent (Mid-Game)
 
 
