@@ -80,9 +80,7 @@ class ClientHandler:
                 self.socket.shutdown(socket.SHUT_RDWR)  # Shutdown for both reading and writing
             except socket.error as e:
                 print(f"Error shutting down socket for {self.name}: {e}")
-        #     self.disconnect()
-        # else:
-        #     self.disconnect()
+
 
     def disqualify(self):
         """
