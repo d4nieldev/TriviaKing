@@ -52,13 +52,37 @@ class ClientHandler:
         self.reset_state()
         self.thread.start()
 
+    # def join(self):
+    #     """
+    #     Gracefully exits the server by shutting down the socket and joining the thread.
+    #     """
+    #     self.exit_gracefully = True
+    #     self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
+    #     self.thread.join()
+    
     def join(self):
         """
-        Gracefully exits the server by shutting down the socket and joining the thread.
+        Gracefully exits the server by first shutting down the socket for reading, 
+        then joining the thread with a timeout, and handling any remaining active connections.
         """
         self.exit_gracefully = True
-        self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
-        self.thread.join()
+        try:
+            self.socket.shutdown(socket.SHUT_RD)  # Initially attempt to stop receiving data
+        except socket.error as e:
+            print(f"Error shutting down socket for receiving from {self.name}: {e}")
+
+        self.thread.join(timeout=c.SERVER_POST_GAME_OVER_DISCONNECT_TIMEOUT_SEC)
+        if self.thread.is_alive():
+            # If the thread is still alive after the timeout, send a final message and forcefully disconnect
+            print(f"Timeout reached for {self.name}, forcing disconnection.")
+            self.send_message(c.GAME_OVER_MESSAGE, "You are just too scary boi. Game was stopped due to opponent disconnection, you are the winner!")
+            try:
+                self.socket.shutdown(socket.SHUT_RDWR)  # Shutdown for both reading and writing
+            except socket.error as e:
+                print(f"Error shutting down socket for {self.name}: {e}")
+        #     self.disconnect()
+        # else:
+        #     self.disconnect()
 
     def disqualify(self):
         """
@@ -476,12 +500,17 @@ def game_loop() -> ClientHandler:
 
         round_num += 1
 
-    winner = get_in_game_players()[0]
+    winner = get_in_game_players()[0] if get_in_game_players() else None
     print("waiting for clients to exit gracefully...")
     for ch in CLIENTS_HANDLERS:
         ch.join()
 
-    return winner
+    if winner:
+        print(f"{c.COLOR_GREEN}The winner is {winner.name}{c.COLOR_RESET}")
+        return winner
+    else:
+        print(f"{c.COLOR_YELLOW}No winner, all players disconnected.{c.COLOR_RESET}")
+        return None
     
 
 def send_game_over_message(winner: str):
