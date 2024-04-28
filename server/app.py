@@ -52,13 +52,6 @@ class ClientHandler:
         self.reset_state()
         self.thread.start()
 
-    # def join(self):
-    #     """
-    #     Gracefully exits the server by shutting down the socket and joining the thread.
-    #     """
-    #     self.exit_gracefully = True
-    #     self.socket.shutdown(socket.SHUT_RD)  # stop receiving data from client
-    #     self.thread.join()
     
     def join(self):
         """
@@ -91,6 +84,7 @@ class ClientHandler:
         self.in_game = False
         self.send_message(c.GENERAL_MESSAGE, "We hope your brain is not your strongest muscle, try better in the next game!")
 
+
     def disconnect(self):
         """
         Disconnects the client from the server.
@@ -107,6 +101,7 @@ class ClientHandler:
                 self.in_game = False
                 with WAIT_FOR_ANSWERS_CONDITION:
                     WAIT_FOR_ANSWERS_CONDITION.notify()
+ 
     
     def send_message(self, message_type: str, message: str) -> None:
             """
@@ -124,6 +119,7 @@ class ClientHandler:
                 self.socket.sendall(message.encode())
             except (BrokenPipeError, ConnectionResetError):
                 self.disconnect()
+
 
     def handle(self):
         """
@@ -204,8 +200,6 @@ CLIENTS_HANDLERS: list[ClientHandler] = []
 CLIENTS_HANDLERS_LOCK: threading.Lock = threading.Lock()
 
 
-import socket
-
 def get_ip_address() -> str:
     """
     Get the IP address of the current machine.
@@ -216,11 +210,12 @@ def get_ip_address() -> str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # Connect to any IP (here we choose Google's public DNS server)
-        s.connect(('8.8.8.8', 80))
+        s.connect(c.GOOGLE_ADDRESS)
         ip_address = s.getsockname()[0]
     finally:
         s.close()
     return ip_address
+
 
 def is_socket_closed(sock: socket.socket) -> bool:
     """

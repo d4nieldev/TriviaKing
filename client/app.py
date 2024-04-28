@@ -13,6 +13,7 @@ except ImportError:
     pass
 
 PRINT_LOCK = threading.Lock()
+RECONNECT_LOCK = threading.Lock()
 BOT_USED_NUMBERS = set()  # Keep track of used bot numbers
 TEAM_USED_NAMES = set()  # Hard-coded list of team names, randomlly picked by Client app
 
@@ -54,11 +55,11 @@ class Client:
         are monitored in a class variable.
         '''
         while True:
-            random_number = random.randint(1, 99999999999)  # Generate a random number
+            random_number = random.randint(c.MIN_BOT_ID, c.MAX_BOT_ID)  # Generate a random number
             if random_number not in BOT_USED_NUMBERS:
                 BOT_USED_NUMBERS.add(random_number)  # Mark this number as used
                 # Return the unique bot team name
-                return f"BOT_#{random_number}"
+                return c.BOT_NAME_FORMAT.format(id=random_number)
 
     
     @classmethod
@@ -112,8 +113,8 @@ class Client:
         Change client's state without giving the activator of the function direct
         access to class attributes.
         '''
+        safe_print(f"{self.team_name} transitioned from state {self.state} to state: {new_state}")
         self.state = new_state
-        safe_print(f"{self.team_name} transitioned to state: {new_state}")
 
 
     def parse_broadcast_message(self, data: bytes):
@@ -174,13 +175,16 @@ class Client:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.tcp_socket.connect((self.server_ip, self.server_port))
-            self.tcp_socket.send((self.team_name + '\n').encode())
+            self.tcp_socket.send((self.team_name + c.CLIENT_NAME_TERMINATION).encode())
             self.connected = True
             safe_print(f"{self.team_name} connected to the server and sent player name.")
             self.transition_state(c.CLIENT_STATE_GAME_MODE)
         except Exception as e:
             safe_print(f"{c.COLOR_RED}Failed to connect: {e}{c.COLOR_RESET}")
-            self.disconnect()
+            
+            # Connecion failed, allow client to look for other servers
+            self.reconnect()
+            
 
     def listen_to_server(self):
         '''
@@ -191,12 +195,13 @@ class Client:
                 if self.tcp_socket is None:
                     safe_print(f'{c.COLOR_RED}No connection to the server. Attempting to reconnect...{c.COLOR_RESET}')
                     self.reconnect()
-                    continue  # Continue to the next iteration of the loop after attempting to reconnect
+                    break  # Stop listening to server, look for another connection and restart
                 
                 data = self.tcp_socket.recv(self.BUFFER_SIZE)
                 if not data:
                     safe_print(f'{c.COLOR_RED}server disconnected. reconnecting...{c.COLOR_RESET}')
                     self.reconnect()
+                    break # Stop listening to server (disconnected), look for another connection and restart
                 self.received_new_message.set()
                 new_server_messages = data.decode().split(c.SERVER_MSG_TERMINATION)
                 new_server_messages = [msg for msg in new_server_messages if len(msg) > 0]
@@ -207,6 +212,11 @@ class Client:
                 self.reconnect()
                 break
             
+        # We exited the loop for error / game over, etc...
+        # Notify main thread that server disconnected - Free it
+        with self.server_messages_pending_condition:
+            self.server_messages_pending_condition.notify()
+            
     
     def wait_for_input(self):
         '''
@@ -214,12 +224,11 @@ class Client:
         '''
         self.received_new_message.clear()
         ans = None
-        # safe_print("Current question: ", self.curr_question)
         safe_print("Answer: ", end='', flush=True)
         while not self.received_new_message.is_set():
             try:
                 # Use select to check if there is input available without blocking
-                input_ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+                input_ready, _, _ = select.select([sys.stdin], [], [], c.CLIENT_INPUT_REFRESH_SEC)
                 if input_ready:
                     # Read user input
                     ans = sys.stdin.readline().rstrip()
@@ -230,6 +239,7 @@ class Client:
                     ans = sys.stdin.readline().rstrip()
                     break
         return ans
+
 
     def game_mode(self):
         '''
@@ -249,6 +259,8 @@ class Client:
                 with self.server_messages_pending_condition:
                     if len(self.server_messages) == 0:
                         self.server_messages_pending_condition.wait()
+                    if not self.connected:
+                        break
 
                     server_message = self.server_messages.pop(0)
             else:
@@ -272,29 +284,36 @@ class Client:
             elif server_message.startswith(c.GAME_OVER_MESSAGE):
                 server_message = server_message.replace(c.GAME_OVER_MESSAGE, "")
                 safe_print(f"{c.COLOR_GREEN}{server_message}{c.COLOR_RESET}")
-                self.reconnect()
+                self.reconnect()  # Will change state => exit loop
             elif server_message.startswith(c.GENERAL_MESSAGE):
                 server_message = server_message.replace(c.GENERAL_MESSAGE, "")
                 safe_print(f"{c.COLOR_YELLOW}{server_message}{c.COLOR_RESET}")
+                
 
     def disconnect(self):
         '''
-        Close connection from server (errors)
+        Close TCP connection with server
         '''
-        if self.tcp_socket:
-            self.tcp_socket.close()
-            safe_print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
-            self.tcp_socket = None
-            self.connected = False
+        self.tcp_socket.close()
+        safe_print(f"{c.COLOR_RED}{self.team_name} disconnected from server.{c.COLOR_RESET}")
+        self.tcp_socket = None
+        self.connected = False
+
     
     def reconnect(self):
         '''
         Close connection with current server and open player to look for other 
         available servers.
+        Use RECONNECT_LOCK to ensure reconnect function is not being called twice
         '''
-        self.disconnect()
-        _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish {self.team_name} to reconnect to the game server{c.COLOR_RESET}")
-        self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
+        with RECONNECT_LOCK:
+            if self.tcp_socket:
+                self.disconnect()
+                _ = input(f"{c.COLOR_YELLOW}Press Enter if you wish {self.team_name} to reconnect to the game server{c.COLOR_RESET}")
+                
+            if self.state != c.CLIENT_STATE_LOOKING_FOR_SERVER:
+                self.transition_state(c.CLIENT_STATE_LOOKING_FOR_SERVER)
+
 
     def run(self):
         '''
@@ -318,20 +337,21 @@ def create_player(bot=False, bot_level_str='c'):
     Bots are created in threads, so an external worker function like this is needed.
     '''
     if bot:
-        client = Client(bot=True, bot_level=c.BOT_LEVELS.get(bot_level_str, None))
-        client.run()
+        client = Client(bot=True, bot_level=c.BOT_LEVELS[bot_level_str])
+        
     else:
         client = Client(bot=False)
         safe_print(f"{c.COLOR_BLUE}Your team name is: {client.team_name}{c.COLOR_RESET}")
-        client.run()
-    return
+    
+    client.run()
+
 
 
 if __name__ == '__main__':
     while True:
         client_type = input(
             """\nHello comrad!\nPress P if you want to sign in as a player.\nPress B if you want bot players to join the game:\n""").lower().strip()
-        if client_type == "b":
+        if client_type == c.BOT_TYPE:
             while True:
                 try:
                     num_bots = int(input("""How many bots would you like to add to the game?\n""").lower().strip())
@@ -340,10 +360,10 @@ if __name__ == '__main__':
                     break
                 except Exception:
                     safe_print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
-                    continue
+
             while True:
                 bot_level_str = input("""\nHow smart would you like the bot to be?\nPress 'A' for Sheldon Cooper smart\nPress 'B' for Brainy Smurf smart\nPress 'C' for average US public school smart\nPress 'D' for Dumb as Fu*k\n""").lower().strip()
-                if bot_level_str not in ['a','b','c','d']:
+                if bot_level_str not in c.BOT_LEVELS.keys():
                     safe_print(f'{c.COLOR_RED}Invalid player choice. Try better next time.{c.COLOR_RESET}')
                     continue
                 break
@@ -359,7 +379,7 @@ if __name__ == '__main__':
                 thread.join()
             break
 
-        elif client_type == "p":
+        elif client_type == c.PLAYER_TYPE:
             create_player(bot=False)
             break
         else:

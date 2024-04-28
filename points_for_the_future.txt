@@ -36,21 +36,23 @@ DO NOT DELETE TASKS, MARK AS !!DONE!!
 29. !!DONE!! I think we are wrong and 1 round is the loop until 1 player left standing (and the game is only one round) (Shahar let me know)
 30. !!DONE!! Need to create try-catch for client - in case of server error (Shahar)
 31. !!DONE!! Add input to client before a new Game (Shahar)
-32. Verify edge cases (Mac - Dani, Windows - Shahar):
+32. !!DONE!! Verify edge cases (Mac - Dani, Windows - Shahar):
     !!DONE!! Server collapsed
     Client collapsed:
         - !!DONE!! Before questions were sent - Stuck on "waiting for clients to exit gracefully..."?
         - !!DONE!! After questions were sent (Mid-Game)
         - !!DONE!! All clients disconnects from server? (before game) - Last to disconnect wins
         - !!DONE!! All clients disconnects from server? (game started) - Last to disconnect wins
-33. Client disconnect print shows too many times, probably multiple activations of disconnect / reconnect functions
+33. !!DONE!! Client disconnect print shows too many times, probably multiple activations of disconnect / reconnect functions
     Debug the problem and fix the extra print (Shahar + Dani)
-34. Attempting to reconect has to be pressed twice for it to move to the next game (Shahar + Dani)
+34. !!DONE!! Attempting to reconect has to be pressed twice for it to move to the next game (Shahar + Dani)
     Happens when moving to the next game from a finished game
-35. When closing the server for 2 players we get the "do you want to reconnect". Happened a few
+35. !!DONE!! When closing the server for 2 players we get the "do you want to reconnect". Happened a few
     times where they both transitioned to "looking_for_server", but only one was actually able to connect
     teh other was stuck in a loop. So after server collapsed, not all "old" clients are able to connect 
     to a new server (Shahar + Dani)
 36. !!DONE!! Can open 2 servers at the same time? Yes, but when from one computer, only one is getting connections
+37. When server disconnects, then a new one is opened for already existing clients (from last server)
+    you need to press Enter twice. Happens only after server already sent a question
 
 
