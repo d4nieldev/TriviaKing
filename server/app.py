@@ -506,25 +506,28 @@ def game_loop() -> ClientHandler:
         return None
     
 
-def send_game_over_message(winner: str):
+def send_game_over_message(winner: ClientHandler):
     """
     Sends a game over message to all clients, indicating the winner of the game.
 
     Args:
-        winner (str): The name of the winner.
+        winner (ClientHandler): The name of the winner.
 
     Returns:
         None
     """
+    if winner is None:
+        print(f"{c.COLOR_RED}All players disconnected. No winner today!{c.COLOR_RESET}")
+        return
     clients_handlers = list(CLIENTS_HANDLERS)
     for ch in clients_handlers:
         msg = None
         if ch.in_game:
             msg = f"{c.COLOR_GREEN}You are the winner!{c.COLOR_RESET}"
             # add the winner to the stats
-            server_stats.add_player_win(winner)
+            server_stats.add_player_win(winner.name)
         else:
-            msg = f"The winner is: {winner}"
+            msg = f"The winner is: {winner.name}"
         ch.send_message(c.GAME_OVER_MESSAGE, msg)
 
     time.sleep(c.SERVER_POST_GAME_OVER_DISCONNECT_TIMEOUT_SEC)
@@ -573,7 +576,7 @@ def listen(server_port: int = 0) -> None:
 
             send_welcome_message()
             winner = game_loop()
-            send_game_over_message(winner=winner.name)
+            send_game_over_message(winner=winner)
             server_stats.print_player_wins()
         
 
